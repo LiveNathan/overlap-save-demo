@@ -1,12 +1,15 @@
 package dev.nathanlively.overlap_save_demo;
 
 import com.github.psambit9791.jdsp.io.WAV;
+import com.github.psambit9791.wavfile.WavFileException;
+import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.util.MathArrays;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Hashtable;
 
@@ -17,50 +20,26 @@ class ConvolutionTest {
 
     @Test
     void apache() throws Exception {
-        Convolution convolution = new ApachePort();
+        Convolution convolution = new JdspPort();
         String filePathKernel = "src/test/resources/LakeMerrittBART.wav";
         String filePathSignal = "src/test/resources/11_Lecture-44k.wav";
         
         // Load kernel (impulse response)
-        WAV wavFile = new WAV();
-        wavFile.readWAV(filePathKernel);
-        @SuppressWarnings("unchecked") Hashtable<String, Long> kernelProperties = wavFile.getProperties();
-        log.info("Kernel WAV properties: {}", kernelProperties);
-        double[][] echoBridge = wavFile.getData("int");
-        // extract just the left side
-        int height = echoBridge.length;
-        double[] kernel = new double[height];
-        for (int i = 0; i < height; i++) {
-            kernel[i] = echoBridge[i][0];
-        }
-        assertThat(kernel.length).isEqualTo(height);
-        double kernelSum = Arrays.stream(kernel).sum();
+        WavFile kernelAudio = loadWavFile(filePathKernel);
+        final double[] signalValues = kernelAudio.signal();
+        double kernelSum = Arrays.stream(signalValues).map(Math::abs).sum();
         log.info("Kernel sum: {}", kernelSum);
-        double[] normalizedKernel = MathArrays.normalizeArray(kernel, 1.0);
-        log.info("Normalized kernel sum: {}", Arrays.stream(normalizedKernel).sum());
+        double[] normalizedKernel = new ArrayRealVector(signalValues).unitVector().toArray();
+        log.info("Normalized kernel sum: {}", Arrays.stream(normalizedKernel).map(Math::abs).sum());
 
         // Load signal
-        WAV signalWavFile = new WAV();
-        signalWavFile.readWAV(filePathSignal);
-        @SuppressWarnings("unchecked") Hashtable<String, Long> signalProperties = signalWavFile.getProperties();
-        log.info("Signal WAV properties: {}", signalProperties);
-        long sampleRate = signalProperties.get("SampleRate");
-        double[][] signalData = signalWavFile.getData("int");
-        // extract just the left side
-        int signalHeight = signalData.length;
-        double[] signal = new double[signalHeight];
-        for (int i = 0; i < signalHeight; i++) {
-            signal[i] = signalData[i][0];
-        }
-        assertThat(signal.length).isEqualTo(signalHeight);
-        signal = Arrays.copyOf(signal, (int) sampleRate);
-        double maxSignal = Arrays.stream(signal).max().orElseThrow();
+        final WavFile signalFile = loadWavFile(filePathSignal);
+        double maxSignal = Arrays.stream(signalFile.signal()).max().orElseThrow();
         log.info("Signal max: {}", maxSignal);
-        double[] scaledSignal = MathArrays.scale(1.0 / maxSignal, signal);
-        log.info("Scaled signal max: {}", Arrays.stream(scaledSignal).max().orElseThrow());
+        double[] signal = Arrays.copyOf(signalFile.signal(), (int) signalFile.sampleRate() * 10);
 
         // Perform convolution
-        double[] actual = convolution.with(scaledSignal, normalizedKernel);
+        double[] actual = convolution.with(signal, normalizedKernel);
 
         assertThat(actual).isNotNull();
         assertThat(actual.length).isGreaterThan(0);
@@ -87,7 +66,7 @@ class ConvolutionTest {
         WAV wavObj = new WAV();
         wavObj.putData(
                 wavData,
-                sampleRate,
+                signalFile.sampleRate(),
                 "double",
                 filePath
         );
@@ -96,5 +75,27 @@ class ConvolutionTest {
         
         // Verify the output file was created
         assertThat(new File(filePath)).exists();
+    }
+
+    private WavFile loadWavFile(String filePathSignal) throws WavFileException, IOException {
+        WAV signalWavFile = new WAV();
+        signalWavFile.readWAV(filePathSignal);
+        @SuppressWarnings("unchecked") Hashtable<String, Long> signalProperties = signalWavFile.getProperties();
+        log.info("Signal WAV properties: {}", signalProperties);
+        long sampleRate = signalProperties.get("SampleRate");
+        double[][] signalData = signalWavFile.getData("int");
+        short bitDepth = (short) Math.toIntExact(signalProperties.get("ValidBits"));
+        double scaleFactor = Math.pow(2, bitDepth - 1) - 1;
+        // extract just the left side
+        int signalHeight = signalData.length;
+        double[] signal = new double[signalHeight];
+        for (int i = 0; i < signalHeight; i++) {
+            signal[i] = signalData[i][0] / scaleFactor;
+        }
+        assertThat(signal.length).isEqualTo(signalHeight);
+        return new WavFile(sampleRate, signal);
+    }
+
+    private record WavFile(long sampleRate, double[] signal) {
     }
 }
