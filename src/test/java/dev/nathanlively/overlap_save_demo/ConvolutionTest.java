@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Hashtable;
 
@@ -19,12 +21,21 @@ class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
 
     @Test
+    void givenSignalImpulseAndKernelImpulse_whenConvolving_thenReturnImpulse() {
+        Convolution convolution = new ApacheAdapter();
+        double[] impulse = {1};
+
+        double[] actual = convolution.with(impulse, impulse);
+
+        assertThat(actual).isEqualTo(impulse);
+    }
+
+    @Test
     void apache() throws Exception {
-        Convolution convolution = new JdspPort();
         String filePathKernel = "src/test/resources/LakeMerrittBART.wav";
         String filePathSignal = "src/test/resources/11_Lecture-44k.wav";
-        
-        // Load kernel (impulse response)
+
+        // Load kernel
         WavFile kernelAudio = loadWavFile(filePathKernel);
         final double[] signalValues = kernelAudio.signal();
         double kernelSum = Arrays.stream(signalValues).map(Math::abs).sum();
@@ -39,6 +50,7 @@ class ConvolutionTest {
         double[] signal = Arrays.copyOf(signalFile.signal(), (int) signalFile.sampleRate() * 10);
 
         // Perform convolution
+        Convolution convolution = new JdspPort();
         double[] actual = convolution.with(signal, normalizedKernel);
 
         assertThat(actual).isNotNull();
@@ -51,30 +63,7 @@ class ConvolutionTest {
         log.info("Convolution result max after normalization: {}", maxActual);
 
         // Listen to the result
-        // WAV class expects a 2D array with samples as rows and channels as columns
-        int numChannels = 1;
-        int numFrames = actual.length;
-        double[][] wavData = new double[numFrames][numChannels];
-
-        for (int i = 0; i < numFrames; i++) {
-            wavData[i][0] = actual[i];
-        }
-        File outputDir = new File("target/test-outputs");
-        assertThat(outputDir.mkdirs() || outputDir.exists()).isTrue();
-
-        String filePath = outputDir.getPath() + "/convolution-result.wav";
-        WAV wavObj = new WAV();
-        wavObj.putData(
-                wavData,
-                signalFile.sampleRate(),
-                "double",
-                filePath
-        );
-        
-        log.info("Convolution result saved to convolution-result.wav");
-        
-        // Verify the output file was created
-        assertThat(new File(filePath)).exists();
+        saveWavFile(actual, signalFile);
     }
 
     private WavFile loadWavFile(String filePathSignal) throws WavFileException, IOException {
@@ -94,6 +83,31 @@ class ConvolutionTest {
         }
         assertThat(signal.length).isEqualTo(signalHeight);
         return new WavFile(sampleRate, signal);
+    }
+
+    private void saveWavFile(double[] actual, WavFile signalFile) throws IOException, WavFileException {
+        // WAV class expects a 2D array with samples as rows and channels as columns
+        int numChannels = 1;
+        int numFrames = actual.length;
+        double[][] wavData = new double[numFrames][numChannels];
+
+        for (int i = 0; i < numFrames; i++) {
+            wavData[i][0] = actual[i];
+        }
+        Path outputDir = Paths.get("target/test-outputs");
+        Files.createDirectories(outputDir);
+        String outputFileName = "convolution-result.wav";
+        Path outputPath = outputDir.resolve(outputFileName);
+        WAV wavObj = new WAV();
+        wavObj.putData(
+                wavData,
+                signalFile.sampleRate(),
+                "double",
+                outputPath.toString()
+        );
+
+        log.info("Convolution result saved to convolution-result.wav");
+        assertThat(outputPath).exists();
     }
 
     private record WavFile(long sampleRate, double[] signal) {
