@@ -7,6 +7,7 @@ import org.apache.commons.math3.util.MathArrays;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,20 +24,40 @@ class ConvolutionTest {
     @Test
     void givenSignalImpulseAndKernelImpulse_whenConvolving_thenReturnImpulse() {
         Convolution convolution = new ApacheAdapter();
-        double[] impulse = {1};
+        double[] signal = {1};
+        double[] kernel = {1};
 
-        double[] actual = convolution.with(impulse, impulse);
+        double[] actual = convolution.with(signal, kernel);
 
-        assertThat(actual).isEqualTo(impulse);
+        assertThat(actual).isEqualTo(kernel);
+    }
+
+    @Test
+    void givenSignalImpulseAndKernelImpulse_whenConvolving_thenReturnImpulse2() {
+        Convolution convolution = new ApacheAdapter();
+        double[] signal = {1, 0.5};
+        double[] kernel = {0.2, 0.1};
+
+        double[] result = convolution.with(signal, kernel);
+
+        assertThat(result.length).isEqualTo(signal.length + kernel.length - 1); // 2 + 2 - 1 = 3
+        // result[0] = signal[0] * kernel[0] = 1 * 0.2 = 0.2
+        assertThat(result[0]).isEqualTo(0.2);  // 1 * 0.2
+        // result[1] = signal[0] * kernel[1] + signal[1] * kernel[0]
+        // result[1] = (1 * 0.1) + (0.5 * 0.2) = 0.2
+        assertThat(result[1]).isEqualTo(0.2);  // 1 * 0.1 + 0.5 * 0.2
+        // result[2] = signal[1] * kernel[1]
+        // result[2] = 0.5 * 0.1 = 0.05
+        assertThat(result[2]).isEqualTo(0.05); // 0.5 * 0.1
     }
 
     @Test
     void apache() throws Exception {
-        String filePathKernel = "src/test/resources/LakeMerrittBART.wav";
-        String filePathSignal = "src/test/resources/11_Lecture-44k.wav";
+        String fileNameKernel = "LakeMerrittBART.wav";
+        String fileNameSignal = "11_Lecture-44k.wav";
 
         // Load kernel
-        WavFile kernelAudio = loadWavFile(filePathKernel);
+        WavFile kernelAudio = loadWavFile(fileNameKernel);
         final double[] signalValues = kernelAudio.signal();
         double kernelSum = Arrays.stream(signalValues).map(Math::abs).sum();
         log.info("Kernel sum: {}", kernelSum);
@@ -44,7 +65,7 @@ class ConvolutionTest {
         log.info("Normalized kernel sum: {}", Arrays.stream(normalizedKernel).map(Math::abs).sum());
 
         // Load signal
-        final WavFile signalFile = loadWavFile(filePathSignal);
+        final WavFile signalFile = loadWavFile(fileNameSignal);
         double maxSignal = Arrays.stream(signalFile.signal()).max().orElseThrow();
         log.info("Signal max: {}", maxSignal);
         double[] signal = Arrays.copyOf(signalFile.signal(), (int) signalFile.sampleRate() * 10);
@@ -63,12 +84,13 @@ class ConvolutionTest {
         log.info("Convolution result max after normalization: {}", maxActual);
 
         // Listen to the result
-        saveWavFile(actual, signalFile);
+        saveWavFile(signalFile);
     }
 
-    private WavFile loadWavFile(String filePathSignal) throws WavFileException, IOException {
+    private WavFile loadWavFile(String fileName) throws WavFileException, IOException {
+        final String path = new ClassPathResource(fileName).getFile().getCanonicalPath();
         WAV signalWavFile = new WAV();
-        signalWavFile.readWAV(filePathSignal);
+        signalWavFile.readWAV(path);
         @SuppressWarnings("unchecked") Hashtable<String, Long> signalProperties = signalWavFile.getProperties();
         log.info("Signal WAV properties: {}", signalProperties);
         long sampleRate = signalProperties.get("SampleRate");
@@ -85,8 +107,9 @@ class ConvolutionTest {
         return new WavFile(sampleRate, signal);
     }
 
-    private void saveWavFile(double[] actual, WavFile signalFile) throws IOException, WavFileException {
+    private void saveWavFile(WavFile signalFile) throws IOException, WavFileException {
         // WAV class expects a 2D array with samples as rows and channels as columns
+        double[] actual = signalFile.signal();
         int numChannels = 1;
         int numFrames = actual.length;
         double[][] wavData = new double[numFrames][numChannels];
