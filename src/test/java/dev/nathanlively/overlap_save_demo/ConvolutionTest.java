@@ -22,7 +22,7 @@ class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
 
     @Test
-    void givenSignalImpulseAndKernelImpulse_whenConvolving_thenReturnImpulse() {
+    void impulseConvolution_returnsIdentity() {
         Convolution convolution = new ApacheAdapter();
         double[] signal = {1};
         double[] kernel = {1};
@@ -33,7 +33,7 @@ class ConvolutionTest {
     }
 
     @Test
-    void givenSignalImpulseAndKernelImpulse_whenConvolving_thenReturnImpulse2() {
+    void twoElementConvolution_computesExpectedValues() {
         Convolution convolution = new ApacheAdapter();
         double[] signal = {1, 0.5};
         double[] kernel = {0.2, 0.1};
@@ -49,6 +49,18 @@ class ConvolutionTest {
         // result[2] = signal[1] * kernel[1]
         // result[2] = 0.5 * 0.1 = 0.05
         assertThat(result[2]).isEqualTo(0.05); // 0.5 * 0.1
+    }
+
+    @Test
+    void convolutionIsCommutative() {
+        Convolution convolution = new ApacheAdapter();
+        double[] signal = {1, 2, 3};
+        double[] kernel = {0.5, 0.25};
+
+        double[] result1 = convolution.with(signal, kernel);
+        double[] result2 = convolution.with(kernel, signal);
+
+        assertThat(result1).isEqualTo(result2);
     }
 
     @Test
