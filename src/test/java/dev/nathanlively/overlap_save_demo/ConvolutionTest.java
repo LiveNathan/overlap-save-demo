@@ -33,8 +33,7 @@ class ConvolutionTest {
 
     @ParameterizedTest
     @MethodSource("convolutionImplementations")
-    void impulseConvolution_returnsIdentity() {
-        Convolution convolution = new ApacheAdapter();
+    void impulseConvolution_returnsIdentity(Convolution convolution) {
         double[] signal = {1};
         double[] kernel = {1};
 
@@ -45,28 +44,21 @@ class ConvolutionTest {
 
     @ParameterizedTest
     @MethodSource("convolutionImplementations")
-    void twoElementConvolution_computesExpectedValues() {
-        Convolution convolution = new ApacheAdapter();
+    void twoElementConvolution_computesExpectedValues(Convolution convolution) {
         double[] signal = {1, 0.5};
         double[] kernel = {0.2, 0.1};
 
         double[] result = convolution.with(signal, kernel);
 
-        assertThat(result.length).isEqualTo(signal.length + kernel.length - 1); // 2 + 2 - 1 = 3
-        // result[0] = signal[0] * kernel[0] = 1 * 0.2 = 0.2
-        assertThat(result[0]).isEqualTo(0.2);  // 1 * 0.2
-        // result[1] = signal[0] * kernel[1] + signal[1] * kernel[0]
-        // result[1] = (1 * 0.1) + (0.5 * 0.2) = 0.2
-        assertThat(result[1]).isEqualTo(0.2);  // 1 * 0.1 + 0.5 * 0.2
-        // result[2] = signal[1] * kernel[1]
-        // result[2] = 0.5 * 0.1 = 0.05
-        assertThat(result[2]).isEqualTo(0.05); // 0.5 * 0.1
+        assertThat(result.length).isEqualTo(signal.length + kernel.length - 1);
+        assertThat(result[0]).isEqualTo(0.2);
+        assertThat(result[1]).isEqualTo(0.2);
+        assertThat(result[2]).isEqualTo(0.05);
     }
 
     @ParameterizedTest
     @MethodSource("convolutionImplementations")
-    void convolutionIsCommutative() {
-        Convolution convolution = new ApacheAdapter();
+    void convolutionIsCommutative(Convolution convolution) {
         double[] signal = {1, 2, 3};
         double[] kernel = {0.5, 0.25};
 
