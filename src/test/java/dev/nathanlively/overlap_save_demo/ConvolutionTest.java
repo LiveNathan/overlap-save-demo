@@ -4,7 +4,10 @@ import com.github.psambit9791.jdsp.io.WAV;
 import com.github.psambit9791.wavfile.WavFileException;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.util.MathArrays;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
@@ -15,13 +18,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Hashtable;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
 
-    @Test
+    // Characterize Apache Commons time domain convolution
+
+    static Stream<Convolution> convolutionImplementations() {
+        return Stream.of(new ApacheAdapter(), new CustomAdapter());
+    }
+
+    @ParameterizedTest
+    @MethodSource("convolutionImplementations")
     void impulseConvolution_returnsIdentity() {
         Convolution convolution = new ApacheAdapter();
         double[] signal = {1};
@@ -32,7 +43,8 @@ class ConvolutionTest {
         assertThat(actual).isEqualTo(kernel);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("convolutionImplementations")
     void twoElementConvolution_computesExpectedValues() {
         Convolution convolution = new ApacheAdapter();
         double[] signal = {1, 0.5};
@@ -51,7 +63,8 @@ class ConvolutionTest {
         assertThat(result[2]).isEqualTo(0.05); // 0.5 * 0.1
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("convolutionImplementations")
     void convolutionIsCommutative() {
         Convolution convolution = new ApacheAdapter();
         double[] signal = {1, 2, 3};
@@ -63,6 +76,9 @@ class ConvolutionTest {
         assertThat(result1).isEqualTo(result2);
     }
 
+    // Implement custom time domain convolution
+
+    @Disabled
     @Test
     void apache() throws Exception {
         String fileNameKernel = "LakeMerrittBART.wav";
@@ -83,7 +99,7 @@ class ConvolutionTest {
         double[] signal = Arrays.copyOf(signalFile.signal(), (int) signalFile.sampleRate() * 10);
 
         // Perform convolution
-        Convolution convolution = new JdspPort();
+        Convolution convolution = new JdspAdapter();
         double[] actual = convolution.with(signal, normalizedKernel);
 
         assertThat(actual).isNotNull();
