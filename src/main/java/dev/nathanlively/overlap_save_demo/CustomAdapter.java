@@ -1,5 +1,6 @@
 package dev.nathanlively.overlap_save_demo;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.exception.NoDataException;
 import org.apache.commons.math3.util.MathUtils;
 
@@ -22,10 +23,8 @@ public class CustomAdapter implements Convolution {
         final double[] paddedSignal = new double[paddedLength];
         System.arraycopy(signal, 0, paddedSignal, padding, signalLength);
 
-        double[] flippedKernel = new double[kernelLength];
-        for (int i = 0; i < kernelLength; i++) {
-            flippedKernel[i] = kernel[kernelLength - 1 - i];
-        }
+        double[] flippedKernel = ArrayUtils.clone(kernel);
+        ArrayUtils.reverse(flippedKernel);
 
         for (int resultIndex = 0; resultIndex < resultLength; resultIndex++) {
             double sum = 0;

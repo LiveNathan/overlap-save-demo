@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.0</version>
+		<version>3.5.2</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>dev.nathanlively</groupId>
@@ -38,6 +38,11 @@
 			<groupId>com.github.psambit9791</groupId>
 			<artifactId>jdsp</artifactId>
 			<version>3.1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>3.14.0</version>
 		</dependency>
 
 		<dependency>
