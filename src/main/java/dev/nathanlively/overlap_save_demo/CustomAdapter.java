@@ -22,15 +22,20 @@ public class CustomAdapter implements Convolution {
         final double[] paddedSignal = new double[paddedLength];
         System.arraycopy(signal, 0, paddedSignal, padding, signalLength);
 
+        double[] flippedKernel = new double[kernelLength];
+        for (int i = 0; i < kernelLength; i++) {
+            flippedKernel[i] = kernel[kernelLength - 1 - i];
+        }
+
         for (int resultIndex = 0; resultIndex < resultLength; resultIndex++) {
             double sum = 0;
-            for (int kernelIndex = 0; kernelIndex < kernelLength; kernelIndex++) {
-                int signalIndex = resultIndex - kernelIndex + padding;
-                sum += paddedSignal[signalIndex] * kernel[kernelIndex];
+            int startSignalIndex = resultIndex - kernelLength + 1 + padding;
+
+            for (int i = 0; i < kernelLength; i++) {
+                sum += paddedSignal[startSignalIndex + i] * flippedKernel[i];
             }
             result[resultIndex] = sum;
         }
-
         return result;
     }
 }
