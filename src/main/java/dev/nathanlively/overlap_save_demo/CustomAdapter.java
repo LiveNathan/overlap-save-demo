@@ -1,7 +1,6 @@
 package dev.nathanlively.overlap_save_demo;
 
 import org.apache.commons.math3.exception.NoDataException;
-import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathUtils;
 
 public class CustomAdapter implements Convolution {
@@ -18,13 +17,16 @@ public class CustomAdapter implements Convolution {
         }
         final int resultLength = signalLength + kernelLength - 1;
         final double[] result = new double[resultLength];
+        final int padding = kernelLength - 1;
+        final int paddedLength = signalLength + 2 * padding;
+        final double[] paddedSignal = new double[paddedLength];
+        System.arraycopy(signal, 0, paddedSignal, padding, signalLength);
 
         for (int resultIndex = 0; resultIndex < resultLength; resultIndex++) {
             double sum = 0;
-            int kernelIndex = FastMath.max(0, resultIndex + 1 - signalLength);
-            int signalIndex = resultIndex - kernelIndex;
-            while (kernelIndex < kernelLength && signalIndex >= 0) {
-                sum += signal[signalIndex--] * kernel[kernelIndex++];
+            for (int kernelIndex = 0; kernelIndex < kernelLength; kernelIndex++) {
+                int signalIndex = resultIndex - kernelIndex + padding;
+                sum += paddedSignal[signalIndex] * kernel[kernelIndex];
             }
             result[resultIndex] = sum;
         }
