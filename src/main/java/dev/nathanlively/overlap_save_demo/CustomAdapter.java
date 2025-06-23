@@ -4,6 +4,8 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.exception.NoDataException;
 import org.apache.commons.math3.util.MathUtils;
 
+import java.util.Arrays;
+
 public class CustomAdapter implements Convolution {
     @Override
     public double[] with(double[] signal, double[] kernel) {
@@ -26,17 +28,21 @@ public class CustomAdapter implements Convolution {
         final double[] paddedSignal = new double[paddedLength];
         System.arraycopy(signal, 0, paddedSignal, padding, signalLength);
 
-        // Step 2: Flip the kernel for convolution (vs correlation)
+        // Step 2: Flip the kernel for convolution (vs. correlation)
         final double[] flippedKernel = ArrayUtils.clone(kernel);
         ArrayUtils.reverse(flippedKernel);
 
         // Step 3: Slide the flipped kernel over the padded signal
         for (int outputPos = 0; outputPos < resultLength; outputPos++) {
-            double sum = 0;
-            int paddedSignalStartPos = outputPos + padding - kernelLength + 1;
+            int windowStartPos = outputPos + padding - kernelLength + 1;
 
-            for (int kernelPos = 0; kernelPos < kernelLength; kernelPos++) {
-                sum += paddedSignal[paddedSignalStartPos + kernelPos] * flippedKernel[kernelPos];
+            // Extract the current window from the padded signal
+            double[] signalWindow = Arrays.copyOfRange(paddedSignal, windowStartPos, windowStartPos + kernelLength);
+
+            // Compute dot product of window and flipped kernel
+            double sum = 0;
+            for (int i = 0; i < kernelLength; i++) {
+                sum += signalWindow[i] * flippedKernel[i];
             }
             result[outputPos] = sum;
         }
