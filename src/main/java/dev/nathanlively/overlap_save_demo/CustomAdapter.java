@@ -16,25 +16,31 @@ public class CustomAdapter implements Convolution {
         if (signalLength == 0 || kernelLength == 0) {
             throw new NoDataException();
         }
+
         final int resultLength = signalLength + kernelLength - 1;
         final double[] result = new double[resultLength];
+
+        // Step 1: Pad the signal with zeros on both sides
         final int padding = kernelLength - 1;
         final int paddedLength = signalLength + 2 * padding;
         final double[] paddedSignal = new double[paddedLength];
         System.arraycopy(signal, 0, paddedSignal, padding, signalLength);
 
-        double[] flippedKernel = ArrayUtils.clone(kernel);
+        // Step 2: Flip the kernel for convolution (vs correlation)
+        final double[] flippedKernel = ArrayUtils.clone(kernel);
         ArrayUtils.reverse(flippedKernel);
 
-        for (int resultIndex = 0; resultIndex < resultLength; resultIndex++) {
+        // Step 3: Slide the flipped kernel over the padded signal
+        for (int outputPos = 0; outputPos < resultLength; outputPos++) {
             double sum = 0;
-            int startSignalIndex = resultIndex - kernelLength + 1 + padding;
+            int paddedSignalStartPos = outputPos + padding - kernelLength + 1;
 
-            for (int i = 0; i < kernelLength; i++) {
-                sum += paddedSignal[startSignalIndex + i] * flippedKernel[i];
+            for (int kernelPos = 0; kernelPos < kernelLength; kernelPos++) {
+                sum += paddedSignal[paddedSignalStartPos + kernelPos] * flippedKernel[kernelPos];
             }
-            result[resultIndex] = sum;
+            result[outputPos] = sum;
         }
+
         return result;
     }
 }
