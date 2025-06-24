@@ -28,7 +28,7 @@ class ConvolutionTest {
     // Characterize Apache Commons time domain convolution
 
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new CustomAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter());
     }
 
     @ParameterizedTest
@@ -66,6 +66,30 @@ class ConvolutionTest {
         double[] result2 = convolution.with(kernel, signal);
 
         assertThat(result1).isEqualTo(result2);
+    }
+
+    @Test
+    void preparePaddedSignal_addsCorrectPadding() {
+        TimeDomainAdapter adapter = new TimeDomainAdapter();
+        double[] signal = {1, 2};
+        int kernelLength = 3;
+
+        double[] result = adapter.padSignal(signal, kernelLength);
+
+        // Should be: [0, 0, 1, 2, 0, 0] (padding = kernelLength - 1 = 2)
+        assertThat(result).containsExactly(0, 0, 1, 2, 0, 0);
+    }
+
+    @Test
+    void prepareKernel_flipsArray() {
+        TimeDomainAdapter adapter = new TimeDomainAdapter();
+        double[] kernel = {1, 2, 3};
+
+        // Access via reflection or make methods package-private for testing
+        double[] result = adapter.reverseKernel(kernel);
+
+        assertThat(result).containsExactly(3, 2, 1);
+        assertThat(kernel).containsExactly(1, 2, 3); // original unchanged
     }
 
     // Implement custom time domain convolution
