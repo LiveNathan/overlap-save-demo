@@ -74,10 +74,9 @@ class ConvolutionTest {
         double[] signal = {1, 2};
         int kernelLength = 3;
 
-        double[] result = adapter.padSignal(signal, kernelLength);
+        double[] paddedSignal = adapter.padSignal(signal, kernelLength);
 
-        // Should be: [0, 0, 1, 2, 0, 0] (padding = kernelLength - 1 = 2)
-        assertThat(result).containsExactly(0, 0, 1, 2, 0, 0);
+        assertThat(paddedSignal).containsExactly(0, 0, 1, 2, 0, 0);
     }
 
     @Test
@@ -85,11 +84,9 @@ class ConvolutionTest {
         TimeDomainAdapter adapter = new TimeDomainAdapter();
         double[] kernel = {1, 2, 3};
 
-        // Access via reflection or make methods package-private for testing
-        double[] result = adapter.reverseKernel(kernel);
+        double[] reversedKernel = adapter.reverseKernel(kernel);
 
-        assertThat(result).containsExactly(3, 2, 1);
-        assertThat(kernel).containsExactly(1, 2, 3); // original unchanged
+        assertThat(reversedKernel).containsExactly(3, 2, 1);
     }
 
     // Implement custom time domain convolution
