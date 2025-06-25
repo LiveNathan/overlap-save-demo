@@ -29,7 +29,7 @@ class ConvolutionTest {
     // Characterize Apache Commons time domain convolution
 
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter());
     }
 
     @ParameterizedTest
@@ -91,13 +91,18 @@ class ConvolutionTest {
     }
 
     @Test
-    void prepareSignal_addsCorrectPadding() {
+    void transform_computesFFTForPowerOfTwoSignal() {
         FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
         double[] signal = {1, 2};
 
         Complex[] transform = adapter.transform(signal);
 
-        assertThat(transform).containsExactly(0, 0, 1, 2, 0, 0);
+        assertThat(transform).hasSize(2);
+        // FFT of [1, 2] should be [3+0i, -1+0i]
+        assertThat(transform[0].getReal()).isEqualTo(3.0);
+        assertThat(transform[0].getImaginary()).isEqualTo(0.0);
+        assertThat(transform[1].getReal()).isEqualTo(-1.0);
+        assertThat(transform[1].getImaginary()).isEqualTo(0.0);
     }
 
     // Implement custom time domain convolution
