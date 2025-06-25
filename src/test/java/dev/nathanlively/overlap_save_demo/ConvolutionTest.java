@@ -28,7 +28,7 @@ class ConvolutionTest {
     // Characterize Apache Commons time domain convolution
 
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter());
     }
 
     @ParameterizedTest
