@@ -14,10 +14,10 @@ public class FrequencyDomainAdapter implements Convolution {
     public double[] with(double[] signal, double[] kernel) {
         validateInputs(signal, kernel);
 
-        final Complex[] paddedSignal = transform(signal);
-        final double[] reversedKernel = prepareKernel(kernel);
+        final Complex[] signalTransform = transform(signal);
+        final Complex[] kernelTransform = transform(kernel);
 
-        return computeConvolution(paddedSignal, reversedKernel, signal.length);
+        return computeConvolution(signalTransform, kernelTransform, signal.length);
     }
 
     private void validateInputs(double[] signal, double[] kernel) {
@@ -48,7 +48,7 @@ public class FrequencyDomainAdapter implements Convolution {
         return flippedKernel;
     }
 
-    private double[] computeConvolution(Complex[] paddedSignal, double[] reversedKernel, int signalLength) {
+    private double[] computeConvolution(Complex[] paddedSignal, Complex[] reversedKernel, int signalLength) {
         int kernelLength = reversedKernel.length;
         final int resultLength = signalLength + kernelLength - 1;
         final double[] result = new double[resultLength];
@@ -62,7 +62,7 @@ public class FrequencyDomainAdapter implements Convolution {
         return result;
     }
 
-    private double computeWindowConvolution(Complex[] paddedSignal, double[] preparedKernel,
+    private double computeWindowConvolution(Complex[] paddedSignal, Complex[] preparedKernel,
                                             int outputPos, int padding, int kernelLength) {
         int windowStartPos = outputPos + padding - kernelLength + 1;
         double sum = 0;
