@@ -1,12 +1,12 @@
 package dev.nathanlively.overlap_save_demo;
 
+import org.apache.arrow.memory.util.CommonUtil;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.exception.NoDataException;
 import org.apache.commons.math3.transform.DftNormalization;
 import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
-import org.apache.commons.math3.util.ArithmeticUtils;
 import org.apache.commons.math3.util.MathUtils;
 
 public class FrequencyDomainAdapter implements Convolution {
@@ -30,11 +30,16 @@ public class FrequencyDomainAdapter implements Convolution {
     }
 
     Complex[] transform(double[] signal) {
-        if (!ArithmeticUtils.isPowerOfTwo(signal.length)) {
-            throw new IllegalArgumentException("Signal length must be a power of 2");
-        }
+        final double[] paddedSignal = zeroPadToNextPowerOfTwo(signal);
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        return fft.transform(signal, TransformType.FORWARD);
+        return fft.transform(paddedSignal, TransformType.FORWARD);
+    }
+
+    private double[] zeroPadToNextPowerOfTwo(double[] signal) {
+        int paddedLength = CommonUtil.nextPowerOfTwo(signal.length);
+        double[] paddedSignal = new double[paddedLength];
+        System.arraycopy(signal, 0, paddedSignal, 0, signal.length);
+        return paddedSignal;
     }
 
     double[] prepareKernel(double[] kernel) {
