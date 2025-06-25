@@ -2,6 +2,7 @@ package dev.nathanlively.overlap_save_demo;
 
 import com.github.psambit9791.jdsp.io.WAV;
 import com.github.psambit9791.wavfile.WavFileException;
+import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.util.MathArrays;
 import org.junit.jupiter.api.Disabled;
@@ -87,6 +88,16 @@ class ConvolutionTest {
         double[] reversedKernel = adapter.reverseKernel(kernel);
 
         assertThat(reversedKernel).containsExactly(3, 2, 1);
+    }
+
+    @Test
+    void prepareSignal_addsCorrectPadding() {
+        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
+        double[] signal = {1, 2};
+
+        Complex[] transform = adapter.transform(signal);
+
+        assertThat(transform).containsExactly(0, 0, 1, 2, 0, 0);
     }
 
     // Implement custom time domain convolution
