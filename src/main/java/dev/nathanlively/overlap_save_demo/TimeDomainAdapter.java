@@ -15,15 +15,6 @@ public class TimeDomainAdapter implements Convolution {
         return computeConvolution(paddedSignal, reversedKernel, signal.length);
     }
 
-    private void validateInputs(double[] signal, double[] kernel) {
-        MathUtils.checkNotNull(signal);
-        MathUtils.checkNotNull(kernel);
-
-        if (signal.length == 0 || kernel.length == 0) {
-            throw new NoDataException();
-        }
-    }
-
     double[] padSignal(double[] signal, int kernelLength) {
         final int padding = kernelLength - 1;
         final int paddedLength = signal.length + 2 * padding;
@@ -62,5 +53,14 @@ public class TimeDomainAdapter implements Convolution {
         }
 
         return sum;
+    }
+
+    private void validateInputs(double[] signal, double[] kernel) {
+        MathUtils.checkNotNull(signal);
+        MathUtils.checkNotNull(kernel);
+
+        if (signal.length == 0 || kernel.length == 0) {
+            throw new NoDataException();
+        }
     }
 }

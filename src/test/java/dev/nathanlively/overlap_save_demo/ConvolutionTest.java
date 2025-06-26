@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.stream.Stream;
 
@@ -104,6 +105,22 @@ class ConvolutionTest {
         assertThat(transform[0].getImaginary()).isEqualTo(0.0);
         assertThat(transform[1].getReal()).isEqualTo(-1.0);
         assertThat(transform[1].getImaginary()).isEqualTo(0.0);
+    }
+
+    private static Comparator<Double> doubleComparator() {
+        return (a, b) -> Math.abs(a - b) < 1.0E-15 ? 0 : Double.compare(a, b);
+    }
+
+    @Test
+    void transformRoundTrip_preservesOriginalSignal() {
+        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
+        double[] original = {1, 2, 3, 4};
+
+        Complex[] transformed = adapter.transform(adapter.padArray(original, 8));
+        double[] roundTrip = adapter.inverseTransformRealOnly(transformed);
+
+        assertThat(roundTrip).usingElementComparator(doubleComparator())
+                .containsExactly(1, 2, 3, 4, 0, 0, 0, 0);
     }
 
     // Implement custom time domain convolution

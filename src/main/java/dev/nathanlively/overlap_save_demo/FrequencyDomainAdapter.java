@@ -16,24 +16,26 @@ public class FrequencyDomainAdapter implements Convolution {
         int convolutionLength = signal.length + kernel.length - 1;
         int paddedLength = CommonUtil.nextPowerOfTwo(convolutionLength);
 
-        final Complex[] signalTransform = transform(padArray(signal, paddedLength));
-        final Complex[] kernelTransform = transform(padArray(kernel, paddedLength));
+        final double[] paddedSignal = padArray(signal, paddedLength);
+        final double[] paddedKernel = padArray(kernel, paddedLength);
+        final Complex[] signalTransform = transform(paddedSignal);
+        final Complex[] kernelTransform = transform(paddedKernel);
 
         final Complex[] productTransform = multiplyTransforms(signalTransform, kernelTransform);
-        final double[] convolutionResult = inverseTransform(productTransform);
+        final double[] convolutionResult = inverseTransformRealOnly(productTransform);
 
         return extractValidPortion(convolutionResult, convolutionLength);
+    }
+
+    double[] padArray(double[] array, int targetLength) {
+        double[] padded = new double[targetLength];
+        System.arraycopy(array, 0, padded, 0, array.length);
+        return padded;
     }
 
     Complex[] transform(double[] signal) {
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         return fft.transform(signal, TransformType.FORWARD);
-    }
-
-    private double[] padArray(double[] array, int targetLength) {
-        double[] padded = new double[targetLength];
-        System.arraycopy(array, 0, padded, 0, array.length);
-        return padded;
     }
 
     private Complex[] multiplyTransforms(Complex[] transform1, Complex[] transform2) {
@@ -44,7 +46,7 @@ public class FrequencyDomainAdapter implements Convolution {
         return result;
     }
 
-    private double[] inverseTransform(Complex[] transform) {
+    double[] inverseTransformRealOnly(Complex[] transform) {
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
         Complex[] result = fft.transform(transform, TransformType.INVERSE);
 
