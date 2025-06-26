@@ -22,6 +22,7 @@ import java.util.Hashtable;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
@@ -29,7 +30,7 @@ class ConvolutionTest {
     // Characterize Apache Commons time domain convolution
 
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter());
     }
 
     @ParameterizedTest
@@ -52,7 +53,7 @@ class ConvolutionTest {
         double[] result = convolution.with(signal, kernel);
 
         assertThat(result.length).isEqualTo(signal.length + kernel.length - 1);
-        assertThat(result[0]).isEqualTo(0.2);
+        assertThat(result[0]).isCloseTo(0.2, within(1e-15));
         assertThat(result[1]).isEqualTo(0.2);
         assertThat(result[2]).isEqualTo(0.05);
     }

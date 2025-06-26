@@ -13,49 +13,52 @@ public class FrequencyDomainAdapter implements Convolution {
     public double[] with(double[] signal, double[] kernel) {
         validateInputs(signal, kernel);
 
-        final Complex[] signalTransform = transform(signal);
-        final Complex[] kernelTransform = transform(kernel);
+        int convolutionLength = signal.length + kernel.length - 1;
+        int paddedLength = CommonUtil.nextPowerOfTwo(convolutionLength);
 
-        return computeConvolution(signalTransform, kernelTransform, signal.length);
+        final Complex[] signalTransform = transform(padArray(signal, paddedLength));
+        final Complex[] kernelTransform = transform(padArray(kernel, paddedLength));
+
+        final Complex[] productTransform = multiplyTransforms(signalTransform, kernelTransform);
+        final double[] convolutionResult = inverseTransform(productTransform);
+
+        return extractValidPortion(convolutionResult, convolutionLength);
     }
 
     Complex[] transform(double[] signal) {
-        final double[] paddedSignal = zeroPadToNextPowerOfTwo(signal);
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        return fft.transform(paddedSignal, TransformType.FORWARD);
+        return fft.transform(signal, TransformType.FORWARD);
     }
 
-    private double[] zeroPadToNextPowerOfTwo(double[] signal) {
-        int paddedLength = CommonUtil.nextPowerOfTwo(signal.length);
-        double[] paddedSignal = new double[paddedLength];
-        System.arraycopy(signal, 0, paddedSignal, 0, signal.length);
-        return paddedSignal;
+    private double[] padArray(double[] array, int targetLength) {
+        double[] padded = new double[targetLength];
+        System.arraycopy(array, 0, padded, 0, array.length);
+        return padded;
     }
 
-    private double[] computeConvolution(Complex[] paddedSignal, Complex[] reversedKernel, int signalLength) {
-        int kernelLength = reversedKernel.length;
-        final int resultLength = signalLength + kernelLength - 1;
-        final double[] result = new double[resultLength];
-        final int padding = kernelLength - 1;
-
-        for (int outputPos = 0; outputPos < resultLength; outputPos++) {
-            result[outputPos] = computeWindowConvolution(paddedSignal, reversedKernel,
-                    outputPos, padding, kernelLength);
+    private Complex[] multiplyTransforms(Complex[] transform1, Complex[] transform2) {
+        Complex[] result = new Complex[transform1.length];
+        for (int i = 0; i < transform1.length; i++) {
+            result[i] = transform1[i].multiply(transform2[i]);
         }
-
         return result;
     }
 
-    private double computeWindowConvolution(Complex[] paddedSignal, Complex[] preparedKernel,
-                                            int outputPos, int padding, int kernelLength) {
-        int windowStartPos = outputPos + padding - kernelLength + 1;
-        double sum = 0;
+    private double[] inverseTransform(Complex[] transform) {
+        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
+        Complex[] result = fft.transform(transform, TransformType.INVERSE);
 
-        for (int i = 0; i < kernelLength; i++) {
-//            sum += paddedSignal[windowStartPos + i] * preparedKernel[i];
+        double[] realResult = new double[result.length];
+        for (int i = 0; i < result.length; i++) {
+            realResult[i] = result[i].getReal();
         }
+        return realResult;
+    }
 
-        return sum;
+    private double[] extractValidPortion(double[] paddedResult, int validLength) {
+        double[] result = new double[validLength];
+        System.arraycopy(paddedResult, 0, result, 0, validLength);
+        return result;
     }
 
     private void validateInputs(double[] signal, double[] kernel) {
