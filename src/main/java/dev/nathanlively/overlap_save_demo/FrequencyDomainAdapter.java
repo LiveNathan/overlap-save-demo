@@ -1,7 +1,6 @@
 package dev.nathanlively.overlap_save_demo;
 
 import org.apache.arrow.memory.util.CommonUtil;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.complex.Complex;
 import org.apache.commons.math3.exception.NoDataException;
 import org.apache.commons.math3.transform.DftNormalization;
@@ -20,15 +19,6 @@ public class FrequencyDomainAdapter implements Convolution {
         return computeConvolution(signalTransform, kernelTransform, signal.length);
     }
 
-    private void validateInputs(double[] signal, double[] kernel) {
-        MathUtils.checkNotNull(signal);
-        MathUtils.checkNotNull(kernel);
-
-        if (signal.length == 0 || kernel.length == 0) {
-            throw new NoDataException();
-        }
-    }
-
     Complex[] transform(double[] signal) {
         final double[] paddedSignal = zeroPadToNextPowerOfTwo(signal);
         FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
@@ -40,12 +30,6 @@ public class FrequencyDomainAdapter implements Convolution {
         double[] paddedSignal = new double[paddedLength];
         System.arraycopy(signal, 0, paddedSignal, 0, signal.length);
         return paddedSignal;
-    }
-
-    double[] prepareKernel(double[] kernel) {
-        final double[] flippedKernel = ArrayUtils.clone(kernel);
-        ArrayUtils.reverse(flippedKernel);
-        return flippedKernel;
     }
 
     private double[] computeConvolution(Complex[] paddedSignal, Complex[] reversedKernel, int signalLength) {
@@ -72,5 +56,14 @@ public class FrequencyDomainAdapter implements Convolution {
         }
 
         return sum;
+    }
+
+    private void validateInputs(double[] signal, double[] kernel) {
+        MathUtils.checkNotNull(signal);
+        MathUtils.checkNotNull(kernel);
+
+        if (signal.length == 0 || kernel.length == 0) {
+            throw new NoDataException();
+        }
     }
 }
