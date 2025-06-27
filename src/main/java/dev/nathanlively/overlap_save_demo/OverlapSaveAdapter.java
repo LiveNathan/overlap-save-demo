@@ -14,10 +14,6 @@ public class OverlapSaveAdapter implements Convolution {
     public double[] with(double[] signal, double[] kernel) {
         validateInputs(signal, kernel);
 
-        return overlapSaveConvolution(signal, kernel);
-    }
-
-    private double[] overlapSaveConvolution(double[] signal, double[] kernel) {
         int kernelLength = kernel.length;
         int chunkSize = calculateOptimalChunkSize(kernelLength);
         int overlap = kernelLength - 1;
@@ -94,9 +90,8 @@ public class OverlapSaveAdapter implements Convolution {
     }
 
     int calculateOptimalChunkSize(int kernelLength) {
-        // Use 8x kernel length as heuristic, then round up to next power of 2
-        int targetSize = kernelLength * 8;
-        return CommonUtil.nextPowerOfTwo(targetSize);
+        if (kernelLength <= 32) return 32;
+        return CommonUtil.nextPowerOfTwo(kernelLength);
     }
 
     // Utility methods (same as FrequencyDomainAdapter)

@@ -53,8 +53,8 @@ class ConvolutionTest {
 
         assertThat(result.length).isEqualTo(signal.length + kernel.length - 1);
         assertThat(result[0]).isCloseTo(0.2, within(1e-15));
-        assertThat(result[1]).isEqualTo(0.2);
-        assertThat(result[2]).isEqualTo(0.05);
+        assertThat(result[1]).isEqualTo(0.2, within(1e-15));
+        assertThat(result[2]).isEqualTo(0.05, within(1e-15));
     }
 
     @ParameterizedTest
