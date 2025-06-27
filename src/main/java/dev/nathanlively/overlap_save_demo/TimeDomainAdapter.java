@@ -1,8 +1,9 @@
 package dev.nathanlively.overlap_save_demo;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.math3.exception.NoDataException;
-import org.apache.commons.math3.util.MathUtils;
+import org.apache.commons.math4.legacy.exception.NoDataException;
+
+import java.util.Objects;
 
 public class TimeDomainAdapter implements Convolution {
     @Override
@@ -56,8 +57,8 @@ public class TimeDomainAdapter implements Convolution {
     }
 
     private void validateInputs(double[] signal, double[] kernel) {
-        MathUtils.checkNotNull(signal);
-        MathUtils.checkNotNull(kernel);
+        Objects.requireNonNull(signal, "signal cannot be null");
+        Objects.requireNonNull(kernel, "kernel cannot be null");
 
         if (signal.length == 0 || kernel.length == 0) {
             throw new NoDataException();

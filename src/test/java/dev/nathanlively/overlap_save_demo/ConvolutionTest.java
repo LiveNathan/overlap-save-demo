@@ -2,9 +2,9 @@ package dev.nathanlively.overlap_save_demo;
 
 import com.github.psambit9791.jdsp.io.WAV;
 import com.github.psambit9791.wavfile.WavFileException;
-import org.apache.commons.math3.complex.Complex;
-import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.util.MathArrays;
+import org.apache.commons.math4.legacy.core.MathArrays;
+import org.apache.commons.math4.legacy.linear.ArrayRealVector;
+import org.apache.commons.numbers.complex.Complex;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

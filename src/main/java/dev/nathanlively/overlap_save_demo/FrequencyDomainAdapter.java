@@ -1,12 +1,12 @@
 package dev.nathanlively.overlap_save_demo;
 
 import org.apache.arrow.memory.util.CommonUtil;
-import org.apache.commons.math3.complex.Complex;
-import org.apache.commons.math3.exception.NoDataException;
-import org.apache.commons.math3.transform.DftNormalization;
-import org.apache.commons.math3.transform.FastFourierTransformer;
-import org.apache.commons.math3.transform.TransformType;
-import org.apache.commons.math3.util.MathUtils;
+import org.apache.commons.math4.legacy.exception.NoDataException;
+import org.apache.commons.math4.transform.FastFourierTransform;
+import org.apache.commons.numbers.complex.Complex;
+
+import java.util.Objects;
+
 
 public class FrequencyDomainAdapter implements Convolution {
     @Override
@@ -34,8 +34,8 @@ public class FrequencyDomainAdapter implements Convolution {
     }
 
     Complex[] transform(double[] signal) {
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        return fft.transform(signal, TransformType.FORWARD);
+        FastFourierTransform fft = new FastFourierTransform(FastFourierTransform.Norm.STD);
+        return fft.apply(signal);
     }
 
     private Complex[] multiplyTransforms(Complex[] transform1, Complex[] transform2) {
@@ -47,8 +47,8 @@ public class FrequencyDomainAdapter implements Convolution {
     }
 
     double[] inverseTransformRealOnly(Complex[] transform) {
-        FastFourierTransformer fft = new FastFourierTransformer(DftNormalization.STANDARD);
-        Complex[] result = fft.transform(transform, TransformType.INVERSE);
+        FastFourierTransform fft = new FastFourierTransform(FastFourierTransform.Norm.STD, true);
+        Complex[] result = fft.apply(transform);
 
         double[] realResult = new double[result.length];
         for (int i = 0; i < result.length; i++) {
@@ -64,8 +64,8 @@ public class FrequencyDomainAdapter implements Convolution {
     }
 
     private void validateInputs(double[] signal, double[] kernel) {
-        MathUtils.checkNotNull(signal);
-        MathUtils.checkNotNull(kernel);
+        Objects.requireNonNull(signal, "signal cannot be null");
+        Objects.requireNonNull(kernel, "kernel cannot be null");
 
         if (signal.length == 0 || kernel.length == 0) {
             throw new NoDataException();
