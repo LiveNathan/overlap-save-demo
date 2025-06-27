@@ -7,7 +7,7 @@ import org.apache.commons.numbers.complex.Complex;
 
 import java.util.Objects;
 
-public class FrequencyDomainAdapter implements Convolution {
+public class OverlapSaveAdapter implements Convolution {
     @Override
     public double[] with(double[] signal, double[] kernel) {
         validateInputs(signal, kernel);

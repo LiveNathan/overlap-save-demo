@@ -28,10 +28,8 @@ import static org.assertj.core.api.Assertions.within;
 class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
 
-    // Characterize Apache Commons time domain convolution
-
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter(), new OverlapSaveAdapter());
     }
 
     @ParameterizedTest
