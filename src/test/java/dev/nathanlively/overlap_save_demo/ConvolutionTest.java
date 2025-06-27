@@ -66,7 +66,8 @@ class ConvolutionTest {
         double[] result1 = convolution.with(signal, kernel);
         double[] result2 = convolution.with(kernel, signal);
 
-        assertThat(result1).isEqualTo(result2);
+        assertThat(result1).usingElementComparator(doubleComparator())
+                .containsExactly(result2);
     }
 
     @Test
