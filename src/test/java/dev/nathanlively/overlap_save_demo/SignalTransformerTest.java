@@ -17,7 +17,7 @@ class SignalTransformerTest {
         FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
         double[] signal = {1, 2};
 
-        Complex[] transform = SignalTransformer.transform(signal);
+        Complex[] transform = SignalTransformer.fft(signal);
 
         assertThat(transform).hasSize(2);
         // FFT of [1, 2] should be [3+0i, -1+0i]
@@ -32,8 +32,8 @@ class SignalTransformerTest {
         FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
         double[] original = {1, 2, 3, 4};
 
-        Complex[] transformed = SignalTransformer.transform(SignalTransformer.padArray(original, 8));
-        double[] roundTrip = SignalTransformer.inverseTransformRealOnly(transformed);
+        Complex[] transformed = SignalTransformer.fft(SignalTransformer.pad(original, 8));
+        double[] roundTrip = SignalTransformer.ifft(transformed);
 
         assertThat(roundTrip).usingElementComparator(doubleComparator())
                 .containsExactly(1, 2, 3, 4, 0, 0, 0, 0);

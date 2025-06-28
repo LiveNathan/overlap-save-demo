@@ -6,18 +6,18 @@ import org.apache.commons.numbers.complex.Complex;
 public class FrequencyDomainAdapter implements Convolution {
     @Override
     public double[] with(double[] signal, double[] kernel) {
-        SignalTransformer.validateInputs(signal, kernel);
+        SignalTransformer.validate(signal, kernel);
 
         int convolutionLength = signal.length + kernel.length - 1;
         int paddedLength = CommonUtil.nextPowerOfTwo(convolutionLength);
 
-        final double[] paddedSignal = SignalTransformer.padArray(signal, paddedLength);
-        final double[] paddedKernel = SignalTransformer.padArray(kernel, paddedLength);
-        final Complex[] signalTransform = SignalTransformer.transform(paddedSignal);
-        final Complex[] kernelTransform = SignalTransformer.transform(paddedKernel);
+        final double[] paddedSignal = SignalTransformer.pad(signal, paddedLength);
+        final double[] paddedKernel = SignalTransformer.pad(kernel, paddedLength);
+        final Complex[] signalTransform = SignalTransformer.fft(paddedSignal);
+        final Complex[] kernelTransform = SignalTransformer.fft(paddedKernel);
 
-        final Complex[] productTransform = SignalTransformer.multiplyTransforms(signalTransform, kernelTransform);
-        final double[] convolutionResult = SignalTransformer.inverseTransformRealOnly(productTransform);
+        final Complex[] productTransform = SignalTransformer.multiply(signalTransform, kernelTransform);
+        final double[] convolutionResult = SignalTransformer.ifft(productTransform);
 
         return extractValidPortion(convolutionResult, convolutionLength);
     }

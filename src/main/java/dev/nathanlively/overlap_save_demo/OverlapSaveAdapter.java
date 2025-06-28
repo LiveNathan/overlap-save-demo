@@ -9,7 +9,7 @@ import java.util.List;
 public class OverlapSaveAdapter implements Convolution {
     @Override
     public double[] with(double[] signal, double[] kernel) {
-        SignalTransformer.validateInputs(signal, kernel);
+        SignalTransformer.validate(signal, kernel);
 
         int kernelLength = kernel.length;
         int chunkSize = calculateOptimalChunkSize(kernelLength);
@@ -17,26 +17,26 @@ public class OverlapSaveAdapter implements Convolution {
         int validOutputPerChunk = chunkSize - overlap;
 
         // Pre-compute kernel FFT (reused for all chunks)
-        double[] paddedKernel = SignalTransformer.padArray(kernel, chunkSize);
-        Complex[] kernelTransform = SignalTransformer.transform(paddedKernel);
+        double[] paddedKernel = SignalTransformer.pad(kernel, chunkSize);
+        Complex[] kernelTransform = SignalTransformer.fft(paddedKernel);
 
         List<double[]> results = new ArrayList<>();
         int signalPosition = 0;
 
         while (signalPosition < signal.length) {
-            // Extract chunk with overlap from previous chunk
+            // Extract a chunk with overlap from the previous chunk
             double[] chunk = extractChunk(signal, signalPosition, chunkSize, overlap);
 
             // Convolve this chunk
-            Complex[] chunkTransform = SignalTransformer.transform(chunk);
-            Complex[] productTransform = SignalTransformer.multiplyTransforms(chunkTransform, kernelTransform);
-            double[] chunkResult = SignalTransformer.inverseTransformRealOnly(productTransform);
+            Complex[] chunkTransform = SignalTransformer.fft(chunk);
+            Complex[] productTransform = SignalTransformer.multiply(chunkTransform, kernelTransform);
+            double[] chunkResult = SignalTransformer.ifft(productTransform);
 
             // Keep only the valid portion (discard first 'overlap' samples)
             double[] validPortion = extractValidPortionFromChunk(chunkResult, overlap, validOutputPerChunk);
             results.add(validPortion);
 
-            // Move to next chunk position
+            // Move to the next chunk position
             signalPosition += validOutputPerChunk;
         }
 
@@ -51,7 +51,7 @@ public class OverlapSaveAdapter implements Convolution {
         int signalStart = Math.max(0, startPos - overlap);
         int chunkStart = Math.max(0, overlap - startPos);
 
-        // Copy available signal data into chunk
+        // Copy available signal data into a chunk
         int copyLength = Math.min(signal.length - signalStart, chunkSize - chunkStart);
         if (copyLength > 0) {
             System.arraycopy(signal, signalStart, chunk, chunkStart, copyLength);

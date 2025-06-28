@@ -7,18 +7,18 @@ import org.apache.commons.numbers.complex.Complex;
 import java.util.Objects;
 
 public class SignalTransformer {
-    public static double[] padArray(double[] array, int targetLength) {
+    public static double[] pad(double[] array, int targetLength) {
         double[] padded = new double[targetLength];
         System.arraycopy(array, 0, padded, 0, array.length);
         return padded;
     }
 
-    public static Complex[] transform(double[] signal) {
+    public static Complex[] fft(double[] signal) {
         FastFourierTransform fft = new FastFourierTransform(FastFourierTransform.Norm.STD);
         return fft.apply(signal);
     }
 
-    public static double[] inverseTransformRealOnly(Complex[] transform) {
+    public static double[] ifft(Complex[] transform) {
         FastFourierTransform ifft = new FastFourierTransform(FastFourierTransform.Norm.STD, true);
         Complex[] result = ifft.apply(transform);
 
@@ -29,7 +29,7 @@ public class SignalTransformer {
         return realResult;
     }
 
-    public static Complex[] multiplyTransforms(Complex[] transform1, Complex[] transform2) {
+    public static Complex[] multiply(Complex[] transform1, Complex[] transform2) {
         Complex[] result = new Complex[transform1.length];
         for (int i = 0; i < transform1.length; i++) {
             result[i] = transform1[i].multiply(transform2[i]);
@@ -37,7 +37,7 @@ public class SignalTransformer {
         return result;
     }
 
-    public static void validateInputs(double[] signal, double[] kernel) {
+    public static void validate(double[] signal, double[] kernel) {
         Objects.requireNonNull(signal, "signal cannot be null");
         Objects.requireNonNull(kernel, "kernel cannot be null");
 
