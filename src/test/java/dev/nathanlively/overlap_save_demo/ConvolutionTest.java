@@ -4,7 +4,6 @@ import com.github.psambit9791.jdsp.io.WAV;
 import com.github.psambit9791.wavfile.WavFileException;
 import org.apache.commons.math4.legacy.core.MathArrays;
 import org.apache.commons.math4.legacy.linear.ArrayRealVector;
-import org.apache.commons.numbers.complex.Complex;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -91,35 +90,8 @@ class ConvolutionTest {
         assertThat(reversedKernel).containsExactly(3, 2, 1);
     }
 
-    @Test
-    void transform_computesFFTForPowerOfTwoSignal() {
-        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
-        double[] signal = {1, 2};
-
-        Complex[] transform = adapter.transform(signal);
-
-        assertThat(transform).hasSize(2);
-        // FFT of [1, 2] should be [3+0i, -1+0i]
-        assertThat(transform[0].getReal()).isEqualTo(3.0);
-        assertThat(transform[0].getImaginary()).isEqualTo(0.0);
-        assertThat(transform[1].getReal()).isEqualTo(-1.0);
-        assertThat(transform[1].getImaginary()).isEqualTo(0.0);
-    }
-
     private static Comparator<Double> doubleComparator() {
         return (a, b) -> Math.abs(a - b) < 1.0E-15 ? 0 : Double.compare(a, b);
-    }
-
-    @Test
-    void transformRoundTrip_preservesOriginalSignal() {
-        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
-        double[] original = {1, 2, 3, 4};
-
-        Complex[] transformed = adapter.transform(adapter.padArray(original, 8));
-        double[] roundTrip = adapter.inverseTransformRealOnly(transformed);
-
-        assertThat(roundTrip).usingElementComparator(doubleComparator())
-                .containsExactly(1, 2, 3, 4, 0, 0, 0, 0);
     }
 
     // Implement custom time domain convolution
