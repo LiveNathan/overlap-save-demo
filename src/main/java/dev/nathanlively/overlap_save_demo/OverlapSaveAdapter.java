@@ -12,7 +12,7 @@ public class OverlapSaveAdapter implements Convolution {
         SignalTransformer.validate(signal, kernel);
 
         int kernelLength = kernel.length;
-        int blockSize = calculateOptimalBlockSize(kernelLength);
+        int blockSize = calculateOptimalFftSize(kernelLength);
         int overlap = kernelLength - 1;
         int validOutputPerBlock = blockSize - overlap;
 
@@ -86,7 +86,7 @@ public class OverlapSaveAdapter implements Convolution {
         return finalResult;
     }
 
-    int calculateOptimalBlockSize(int kernelLength) {
+    int calculateOptimalFftSize(int kernelLength) {
         if (kernelLength <= 32) return 32;
         return CommonUtil.nextPowerOfTwo(kernelLength);
     }
