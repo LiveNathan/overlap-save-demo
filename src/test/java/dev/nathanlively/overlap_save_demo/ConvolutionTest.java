@@ -28,7 +28,8 @@ class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
 
     static Stream<Convolution> convolutionImplementations() {
-        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(), new FrequencyDomainAdapter(), new OverlapSaveAdapter());
+        return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(),
+                new FrequencyDomainAdapter(), new OverlapSaveAdapter());
     }
 
     @ParameterizedTest
