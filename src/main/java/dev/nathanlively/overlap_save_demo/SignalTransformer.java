@@ -7,20 +7,30 @@ import org.apache.commons.numbers.complex.Complex;
 import java.util.Objects;
 
 public class SignalTransformer {
+
+    // Cache frequently used FFT instances for better performance
+    private static final ThreadLocal<FastFourierTransform> FORWARD_FFT =
+            ThreadLocal.withInitial(() -> new FastFourierTransform(FastFourierTransform.Norm.STD));
+
+    private static final ThreadLocal<FastFourierTransform> INVERSE_FFT =
+            ThreadLocal.withInitial(() -> new FastFourierTransform(FastFourierTransform.Norm.STD, true));
+
     public static double[] pad(double[] array, int targetLength) {
+        if (array.length >= targetLength) {
+            return array;
+        }
+
         double[] padded = new double[targetLength];
         System.arraycopy(array, 0, padded, 0, array.length);
         return padded;
     }
 
     public static Complex[] fft(double[] signal) {
-        FastFourierTransform fft = new FastFourierTransform(FastFourierTransform.Norm.STD);
-        return fft.apply(signal);
+        return FORWARD_FFT.get().apply(signal);
     }
 
     public static double[] ifft(Complex[] transform) {
-        FastFourierTransform ifft = new FastFourierTransform(FastFourierTransform.Norm.STD, true);
-        Complex[] result = ifft.apply(transform);
+        Complex[] result = INVERSE_FFT.get().apply(transform);
 
         double[] realResult = new double[result.length];
         for (int i = 0; i < result.length; i++) {
@@ -30,6 +40,10 @@ public class SignalTransformer {
     }
 
     public static Complex[] multiply(Complex[] transform1, Complex[] transform2) {
+        if (transform1.length != transform2.length) {
+            throw new IllegalArgumentException("Transform arrays must have same length");
+        }
+
         Complex[] result = new Complex[transform1.length];
         for (int i = 0; i < transform1.length; i++) {
             result[i] = transform1[i].multiply(transform2[i]);
@@ -45,4 +59,5 @@ public class SignalTransformer {
             throw new NoDataException();
         }
     }
+
 }
