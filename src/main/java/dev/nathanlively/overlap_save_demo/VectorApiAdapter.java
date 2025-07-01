@@ -5,9 +5,6 @@ import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.math4.legacy.exception.NoDataException;
-
-import java.util.Objects;
 
 public class VectorApiAdapter implements Convolution {
 
@@ -15,7 +12,7 @@ public class VectorApiAdapter implements Convolution {
 
     @Override
     public double[] with(double[] signal, double[] kernel) {
-        validateInputs(signal, kernel);
+        SignalTransformer.validate(signal, kernel);
 
         final double[] paddedSignal = padSignal(signal, kernel.length);
         final double[] reversedKernel = reverseKernel(kernel);
@@ -70,14 +67,5 @@ public class VectorApiAdapter implements Convolution {
         final double[] flippedKernel = ArrayUtils.clone(kernel);
         ArrayUtils.reverse(flippedKernel);
         return flippedKernel;
-    }
-
-    private void validateInputs(double[] signal, double[] kernel) {
-        Objects.requireNonNull(signal, "signal cannot be null");
-        Objects.requireNonNull(kernel, "kernel cannot be null");
-
-        if (signal.length == 0 || kernel.length == 0) {
-            throw new NoDataException();
-        }
     }
 }
