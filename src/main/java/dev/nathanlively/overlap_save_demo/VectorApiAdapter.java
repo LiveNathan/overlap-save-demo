@@ -45,25 +45,12 @@ public class VectorApiAdapter implements Convolution {
         int windowStartPos = outputPos + padding - kernelLength + 1;
         double sum = 0.0;
 
-        int i = 0;
-
-        // Process full vectors
-        for (; i + vectorLength <= kernelLength; i += vectorLength) {
-            DoubleVector signalVec = DoubleVector.fromArray(SPECIES, paddedSignal, windowStartPos + i);
-            DoubleVector kernelVec = DoubleVector.fromArray(SPECIES, preparedKernel, i);
-
-            DoubleVector product = signalVec.mul(kernelVec);
-            sum += product.reduceLanes(VectorOperators.ADD);
-        }
-
-        // Handle remaining elements with masked operations
-        if (i < kernelLength) {
-            int remainingLength = kernelLength - i;
-            VectorMask<Double> mask = SPECIES.indexInRange(0, remainingLength);
+        for (int i = 0; i < kernelLength; i += vectorLength) {
+            int remainingElements = Math.min(vectorLength, kernelLength - i);
+            VectorMask<Double> mask = SPECIES.indexInRange(0, remainingElements);
 
             DoubleVector signalVec = DoubleVector.fromArray(SPECIES, paddedSignal, windowStartPos + i, mask);
             DoubleVector kernelVec = DoubleVector.fromArray(SPECIES, preparedKernel, i, mask);
-
             DoubleVector product = signalVec.mul(kernelVec, mask);
             sum += product.reduceLanes(VectorOperators.ADD, mask);
         }
