@@ -11,14 +11,14 @@ public class OverlapSaveAdapter implements Convolution {
         int kernelLength = kernel.length;
         int fftSize = calculateOptimalFftSize(signal.length, kernelLength);
         int blockSize = fftSize - kernelLength + 1;
-        int totalOutputLength = signal.length + kernelLength - 1;
+        int resultLength = signal.length + kernelLength - 1;
 
         // Pre-compute kernel FFT (zero-padded to FFT size)
         double[] paddedKernel = SignalTransformer.pad(kernel, fftSize);
         Complex[] kernelTransform = SignalTransformer.fft(paddedKernel);
 
         // Pre-allocate a result array
-        double[] result = new double[totalOutputLength];
+        double[] result = new double[resultLength];
         int resultPosition = 0;
 
         // Create padded signal with initial zeros for overlap
@@ -37,7 +37,7 @@ public class OverlapSaveAdapter implements Convolution {
 
             // Extract valid portion (discard first kernelLength-1 samples due to aliasing)
             int validStart = kernelLength - 1;
-            int validLength = Math.min(blockSize, totalOutputLength - resultPosition);
+            int validLength = Math.min(blockSize, resultLength - resultPosition);
 
             if (validLength > 0) {
                 System.arraycopy(blockResult, validStart, result, resultPosition, validLength);

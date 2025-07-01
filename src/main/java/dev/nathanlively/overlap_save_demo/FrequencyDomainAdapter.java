@@ -8,8 +8,8 @@ public class FrequencyDomainAdapter implements Convolution {
     public double[] with(double[] signal, double[] kernel) {
         SignalTransformer.validate(signal, kernel);
 
-        int convolutionLength = signal.length + kernel.length - 1;
-        int paddedLength = CommonUtil.nextPowerOfTwo(convolutionLength);
+        int resultLength = signal.length + kernel.length - 1;
+        int paddedLength = CommonUtil.nextPowerOfTwo(resultLength);
 
         final double[] paddedSignal = SignalTransformer.pad(signal, paddedLength);
         final double[] paddedKernel = SignalTransformer.pad(kernel, paddedLength);
@@ -19,7 +19,7 @@ public class FrequencyDomainAdapter implements Convolution {
         final Complex[] productTransform = SignalTransformer.multiply(signalTransform, kernelTransform);
         final double[] convolutionResult = SignalTransformer.ifft(productTransform);
 
-        return extractValidPortion(convolutionResult, convolutionLength);
+        return extractValidPortion(convolutionResult, resultLength);
     }
 
     private double[] extractValidPortion(double[] paddedResult, int validLength) {
