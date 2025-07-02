@@ -14,7 +14,7 @@ public class VectorApiAdapter implements Convolution {
     public double[] with(double[] signal, double[] kernel) {
         SignalTransformer.validate(signal, kernel);
 
-        final double[] paddedSignal = padSignal(signal, kernel.length);
+        final double[] paddedSignal = SignalTransformer.padSymmetric(signal, kernel.length - 1);
         final double[] reversedKernel = reverseKernel(kernel);
 
         return computeVectorizedConvolution(paddedSignal, reversedKernel, signal.length);
@@ -53,14 +53,6 @@ public class VectorApiAdapter implements Convolution {
         }
 
         return sum;
-    }
-
-    double[] padSignal(double[] signal, int kernelLength) {
-        final int padding = kernelLength - 1;
-        final int paddedLength = signal.length + 2 * padding;
-        final double[] paddedSignal = new double[paddedLength];
-        System.arraycopy(signal, 0, paddedSignal, padding, signal.length);
-        return paddedSignal;
     }
 
     double[] reverseKernel(double[] kernel) {

@@ -1,27 +1,16 @@
 package dev.nathanlively.overlap_save_demo;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.math4.legacy.exception.NoDataException;
-
-import java.util.Objects;
 
 public class TimeDomainAdapter implements Convolution {
     @Override
     public double[] with(double[] signal, double[] kernel) {
-        validateInputs(signal, kernel);
+        SignalTransformer.validate(signal, kernel);
 
-        final double[] paddedSignal = padSignal(signal, kernel.length);
+        final double[] paddedSignal = SignalTransformer.padSymmetric(signal, kernel.length - 1);
         final double[] reversedKernel = reverseKernel(kernel);
 
         return computeConvolution(paddedSignal, reversedKernel, signal.length);
-    }
-
-    double[] padSignal(double[] signal, int kernelLength) {
-        final int padding = kernelLength - 1;
-        final int paddedLength = signal.length + 2 * padding;
-        final double[] paddedSignal = new double[paddedLength];
-        System.arraycopy(signal, 0, paddedSignal, padding, signal.length);
-        return paddedSignal;
     }
 
     double[] reverseKernel(double[] kernel) {
@@ -56,12 +45,4 @@ public class TimeDomainAdapter implements Convolution {
         return sum;
     }
 
-    private void validateInputs(double[] signal, double[] kernel) {
-        Objects.requireNonNull(signal, "signal cannot be null");
-        Objects.requireNonNull(kernel, "kernel cannot be null");
-
-        if (signal.length == 0 || kernel.length == 0) {
-            throw new NoDataException();
-        }
-    }
 }

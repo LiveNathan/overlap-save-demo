@@ -71,17 +71,6 @@ class ConvolutionTest {
     }
 
     @Test
-    void preparePaddedSignal_addsCorrectPadding() {
-        TimeDomainAdapter adapter = new TimeDomainAdapter();
-        double[] signal = {1, 2};
-        int kernelLength = 3;
-
-        double[] paddedSignal = adapter.padSignal(signal, kernelLength);
-
-        assertThat(paddedSignal).containsExactly(0, 0, 1, 2, 0, 0);
-    }
-
-    @Test
     void prepareKernel_flipsArray() {
         TimeDomainAdapter adapter = new TimeDomainAdapter();
         double[] kernel = {1, 2, 3};

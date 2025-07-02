@@ -15,6 +15,24 @@ public class SignalTransformer {
     private static final ThreadLocal<FastFourierTransform> INVERSE_FFT =
             ThreadLocal.withInitial(() -> new FastFourierTransform(FastFourierTransform.Norm.STD, true));
 
+    public static double[] pad(double[] array, int startPadding, int endPadding) {
+        if (startPadding < 0 || endPadding < 0) {
+            throw new IllegalArgumentException("Padding amounts must be non-negative");
+        }
+
+        if (startPadding == 0 && endPadding == 0) {
+            return array;
+        }
+
+        double[] padded = new double[array.length + startPadding + endPadding];
+        System.arraycopy(array, 0, padded, startPadding, array.length);
+        return padded;
+    }
+
+    public static double[] padSymmetric(double[] array, int padding) {
+        return pad(array, padding, padding);
+    }
+
     public static double[] pad(double[] array, int targetLength) {
         if (array.length >= targetLength) {
             return array;
@@ -59,5 +77,4 @@ public class SignalTransformer {
             throw new NoDataException();
         }
     }
-
 }

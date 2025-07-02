@@ -38,4 +38,14 @@ class SignalTransformerTest {
         assertThat(roundTrip).usingElementComparator(doubleComparator())
                 .containsExactly(1, 2, 3, 4, 0, 0, 0, 0);
     }
+
+    @Test
+    void preparePaddedSignal_addsCorrectPadding() {
+        double[] signal = {1, 2};
+        int kernelLength = 3;
+
+        double[] paddedSignal = SignalTransformer.pad(signal, kernelLength);
+
+        assertThat(paddedSignal).containsExactly(0, 0, 1, 2, 0, 0);
+    }
 }
