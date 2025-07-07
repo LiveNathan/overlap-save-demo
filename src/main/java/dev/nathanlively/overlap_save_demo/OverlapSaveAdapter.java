@@ -20,7 +20,6 @@ public class OverlapSaveAdapter implements Convolution {
 
         // Pre-allocate a result array
         double[] result = new double[resultLength];
-        int resultPosition = 0;
 
         // Create padded signal with initial zeros for overlap
         double[] paddedSignal = SignalTransformer.pad(
@@ -30,8 +29,11 @@ public class OverlapSaveAdapter implements Convolution {
         );
 
         // Process blocks
-        int signalPosition = 0;
-        while (signalPosition < signal.length) {
+        int totalBlocks = (signal.length + blockSize - 1) / blockSize;
+        for (int blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+            int signalPosition = blockIndex * blockSize;
+            int resultPosition = blockIndex * blockSize;
+
             // Extract block with proper overlap handling
             double[] block = extractBlock(paddedSignal, signalPosition, fftSize);
 
@@ -45,10 +47,7 @@ public class OverlapSaveAdapter implements Convolution {
 
             if (validLength > 0) {
                 System.arraycopy(blockResult, blockStartIndex, result, resultPosition, validLength);
-                resultPosition += validLength;
             }
-
-            signalPosition += blockSize;
         }
 
         return result;
