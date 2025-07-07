@@ -23,7 +23,11 @@ public class OverlapSaveAdapter implements Convolution {
         int resultPosition = 0;
 
         // Create padded signal with initial zeros for overlap
-        double[] paddedSignal = SignalTransformer.pad(signal, blockStartIndex, resultLength - signal.length - blockStartIndex);
+        double[] paddedSignal = SignalTransformer.pad(
+                signal,
+                blockStartIndex, // startPaddingAmount
+                resultLength - signal.length - blockStartIndex  // endPaddingAmount
+        );
 
         // Process blocks
         int signalPosition = 0;

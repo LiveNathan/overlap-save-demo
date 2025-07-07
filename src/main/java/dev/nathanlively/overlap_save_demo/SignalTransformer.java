@@ -15,17 +15,17 @@ public class SignalTransformer {
     private static final ThreadLocal<FastFourierTransform> INVERSE_FFT =
             ThreadLocal.withInitial(() -> new FastFourierTransform(FastFourierTransform.Norm.STD, true));
 
-    public static double[] pad(double[] array, int startPadding, int endPadding) {
-        if (startPadding < 0 || endPadding < 0) {
+    public static double[] pad(double[] array, int startPaddingAmount, int endPaddingAmount) {
+        if (startPaddingAmount < 0 || endPaddingAmount < 0) {
             throw new IllegalArgumentException("Padding amounts must be non-negative");
         }
 
-        if (startPadding == 0 && endPadding == 0) {
+        if (startPaddingAmount == 0 && endPaddingAmount == 0) {
             return array;
         }
 
-        double[] padded = new double[array.length + startPadding + endPadding];
-        System.arraycopy(array, 0, padded, startPadding, array.length);
+        double[] padded = new double[array.length + startPaddingAmount + endPaddingAmount];
+        System.arraycopy(array, 0, padded, startPaddingAmount, array.length);
         return padded;
     }
 
