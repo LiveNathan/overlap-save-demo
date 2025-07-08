@@ -31,11 +31,11 @@ public class OverlapSaveAdapter implements Convolution {
         // Process blocks
         int totalBlocks = (signal.length + blockSize - 1) / blockSize;
         for (int blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-            int signalPosition = blockIndex * blockSize;
+            int nextBlockStartIndex = blockIndex * blockSize;
             int resultPosition = blockIndex * blockSize;
 
             // Extract block with proper overlap handling
-            double[] block = extractBlock(paddedSignal, signalPosition, fftSize);
+            double[] block = extractBlock(paddedSignal, nextBlockStartIndex, fftSize);
 
             // Convolve block in frequency domain
             Complex[] blockTransform = SignalTransformer.fft(block);
@@ -51,12 +51,6 @@ public class OverlapSaveAdapter implements Convolution {
         }
 
         return result;
-    }
-
-    private double[] padSignalStart(double[] signal, int resultLength, int blockStartIndex) {
-        double[] paddedSignal = new double[resultLength];
-        System.arraycopy(signal, 0, paddedSignal, blockStartIndex, signal.length);
-        return paddedSignal;
     }
 
     private double[] extractBlock(double[] paddedSignal, int position, int fftSize) {
