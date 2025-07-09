@@ -21,7 +21,7 @@ public class OverlapSaveAdapter implements Convolution {
         // Pre-allocate a result array
         double[] result = new double[resultLength];
 
-        // Create padded signal with initial zeros for overlap
+        // Create a padded signal with initial zeros for overlap
         double[] paddedSignal = SignalTransformer.pad(
                 signal,
                 blockStartIndex, // startPaddingAmount
@@ -36,7 +36,7 @@ public class OverlapSaveAdapter implements Convolution {
             // Extract block with proper overlap handling
             double[] block = extractSignalBlock(paddedSignal, nextBlockStartIndex, fftSize);
 
-            // Convolve block in frequency domain
+            // Convolve block in a frequency domain
             Complex[] blockTransform = SignalTransformer.fft(block);
             Complex[] convolutionTransform = SignalTransformer.multiply(blockTransform, kernelTransform);
             double[] blockResult = SignalTransformer.ifft(convolutionTransform);
@@ -45,7 +45,12 @@ public class OverlapSaveAdapter implements Convolution {
             int validLength = Math.min(blockSize, resultLength - nextBlockStartIndex);
 
             if (validLength > 0) {
-                System.arraycopy(blockResult, blockStartIndex, result, nextBlockStartIndex, validLength);
+                System.arraycopy(
+                        blockResult,  // Source object
+                        blockStartIndex,  // Source index
+                        result,  // Destination object
+                        nextBlockStartIndex,  // Destination index
+                        validLength);  // Source length to copy
             }
         }
 
@@ -85,7 +90,7 @@ public class OverlapSaveAdapter implements Convolution {
         // Larger FFT sizes reduce the number of blocks but increase per-block cost
         int totalConvolutionLength = signalLength + kernelLength - 1;
 
-        // If the signal is much larger than kernel, try larger FFT sizes
+        // If the signal is much larger than the kernel, try larger FFT sizes
         if (signalLength > 10 * kernelLength) {
             // Calculate efficiency for different FFT sizes
             int bestSize = optimalSize;

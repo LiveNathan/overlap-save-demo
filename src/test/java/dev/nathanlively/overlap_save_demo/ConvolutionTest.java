@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.within;
 
 class ConvolutionTest {
     private static final Logger log = LoggerFactory.getLogger(ConvolutionTest.class);
+    private static final double precision = 1e-15;
 
     static Stream<Convolution> allImplementations() {
         return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(),
@@ -43,18 +44,8 @@ class ConvolutionTest {
         assertThat(actual).isEqualTo(kernel);
     }
 
-    @ParameterizedTest
-    @MethodSource("allImplementations")
-    void twoElementConvolution_computesExpectedValues(Convolution convolution) {
-        double[] signal = {1, 0.5};
-        double[] kernel = {0.2, 0.1};
-
-        double[] result = convolution.with(signal, kernel);
-
-        assertThat(result.length).isEqualTo(signal.length + kernel.length - 1);
-        assertThat(result[0]).isCloseTo(0.2, within(1e-15));
-        assertThat(result[1]).isEqualTo(0.2, within(1e-15));
-        assertThat(result[2]).isEqualTo(0.05, within(1e-15));
+    private static Comparator<Double> doubleComparator() {
+        return (a, b) -> Math.abs(a - b) < precision ? 0 : Double.compare(a, b);
     }
 
     @ParameterizedTest
@@ -203,8 +194,18 @@ class ConvolutionTest {
                 .orElse(0.0);
     }
 
-    private static Comparator<Double> doubleComparator() {
-        return (a, b) -> Math.abs(a - b) < 1.0E-15 ? 0 : Double.compare(a, b);
+    @ParameterizedTest
+    @MethodSource("allImplementations")
+    void twoElementConvolution_computesExpectedValues(Convolution convolution) {
+        double[] signal = {1, 0.5};
+        double[] kernel = {0.2, 0.1};
+
+        double[] result = convolution.with(signal, kernel);
+
+        assertThat(result.length).isEqualTo(signal.length + kernel.length - 1);
+        assertThat(result[0]).isCloseTo(0.2, within(precision));
+        assertThat(result[1]).isEqualTo(0.2, within(precision));
+        assertThat(result[2]).isEqualTo(0.05, within(precision));
     }
 
     // Implement custom time domain convolution
