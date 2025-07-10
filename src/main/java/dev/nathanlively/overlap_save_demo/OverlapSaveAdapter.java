@@ -97,7 +97,7 @@ public class OverlapSaveAdapter implements Convolution {
             double bestEfficiency = calculateEfficiency(totalConvolutionLength, kernelLength, optimalSize);
 
             // Try powers of 2 up to a reasonable maximum
-            for (int size = optimalSize * 2; size <= Math.min(8192, totalConvolutionLength); size *= 2) {
+            for (int size = optimalSize * 2; size <= Math.min(optimalSize * 4, totalConvolutionLength); size *= 2) {
                 double efficiency = calculateEfficiency(totalConvolutionLength, kernelLength, size);
                 if (efficiency > bestEfficiency) {
                     bestSize = size;
