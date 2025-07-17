@@ -1,7 +1,5 @@
 package dev.nathanlively.overlap_save_demo;
 
-import com.github.psambit9791.jdsp.io.WAV;
-import com.github.psambit9791.wavfile.WavFileException;
 import org.apache.commons.math4.legacy.core.MathArrays;
 import org.apache.commons.math4.legacy.linear.ArrayRealVector;
 import org.junit.jupiter.api.Disabled;
@@ -10,7 +8,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,7 +15,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Hashtable;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -231,7 +227,7 @@ class ConvolutionTest {
         double[] signal = Arrays.copyOf(signalFile.signal(), (int) signalFile.sampleRate() * 10);
 
         // Perform convolution
-        Convolution convolution = new JdspAdapter();
+        Convolution convolution = new OverlapSaveAdapter();
         double[] actual = convolution.with(signal, normalizedKernel);
 
         assertThat(actual).isNotNull();
@@ -247,52 +243,26 @@ class ConvolutionTest {
         saveWavFile(signalFile);
     }
 
-    private WavFile loadWavFile(String fileName) throws WavFileException, IOException {
-        final String path = new ClassPathResource(fileName).getFile().getCanonicalPath();
-        WAV signalWavFile = new WAV();
-        signalWavFile.readWAV(path);
-        @SuppressWarnings("unchecked") Hashtable<String, Long> signalProperties = signalWavFile.getProperties();
-        log.info("Signal WAV properties: {}", signalProperties);
-        long sampleRate = signalProperties.get("SampleRate");
-        double[][] signalData = signalWavFile.getData("int");
-        short bitDepth = (short) Math.toIntExact(signalProperties.get("ValidBits"));
-        double scaleFactor = Math.pow(2, bitDepth - 1) - 1;
-        // extract just the left side
-        int signalHeight = signalData.length;
-        double[] signal = new double[signalHeight];
-        for (int i = 0; i < signalHeight; i++) {
-            signal[i] = signalData[i][0] / scaleFactor;
-        }
-        assertThat(signal.length).isEqualTo(signalHeight);
-        return new WavFile(sampleRate, signal);
+    private WavFile loadWavFile(String fileName) {
+        WavFileReader reader = new WavFileReader();
+        WavFileReader.MultiChannelWavFile multiChannel = reader.loadFromClasspath(fileName);
+        log.info("Signal WAV properties: channels={}, sampleRate={}, length={}",
+                multiChannel.channelCount(), multiChannel.sampleRate(), multiChannel.length());
+
+        return new WavFile(multiChannel.sampleRate(), multiChannel.getChannel(0));
     }
 
-    private void saveWavFile(WavFile signalFile) throws IOException, WavFileException {
-        // WAV class expects a 2D array with samples as rows and channels as columns
-        double[] actual = signalFile.signal();
-        int numChannels = 1;
-        int numFrames = actual.length;
-        double[][] wavData = new double[numFrames][numChannels];
-
-        for (int i = 0; i < numFrames; i++) {
-            wavData[i][0] = actual[i];
-        }
+    private void saveWavFile(WavFile signalFile) throws IOException {
+        WavFileWriter writer = new WavFileWriter();
         Path outputDir = Paths.get("target/test-outputs");
         Files.createDirectories(outputDir);
         String outputFileName = "convolution-result.wav";
         Path outputPath = outputDir.resolve(outputFileName);
-        WAV wavObj = new WAV();
-        wavObj.putData(
-                wavData,
-                signalFile.sampleRate(),
-                "double",
-                outputPath.toString()
-        );
+
+        writer.saveToFile(signalFile, outputPath);
 
         log.info("Convolution result saved to convolution-result.wav");
         assertThat(outputPath).exists();
     }
 
-    private record WavFile(long sampleRate, double[] signal) {
-    }
 }

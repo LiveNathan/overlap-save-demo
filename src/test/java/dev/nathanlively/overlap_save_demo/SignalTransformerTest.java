@@ -44,7 +44,7 @@ class SignalTransformerTest {
         double[] signal = {1, 2};
         int kernelLength = 3;
 
-        double[] paddedSignal = SignalTransformer.pad(signal, kernelLength);
+        double[] paddedSignal = SignalTransformer.padSymmetric(signal, kernelLength - 1);
 
         assertThat(paddedSignal).containsExactly(0, 0, 1, 2, 0, 0);
     }
