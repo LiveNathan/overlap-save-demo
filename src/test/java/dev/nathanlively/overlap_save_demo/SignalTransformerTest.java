@@ -14,7 +14,6 @@ class SignalTransformerTest {
 
     @Test
     void transform_computesFFTForPowerOfTwoSignal() {
-        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
         double[] signal = {1, 2};
 
         Complex[] transform = SignalTransformer.fft(signal);
@@ -29,7 +28,6 @@ class SignalTransformerTest {
 
     @Test
     void transformRoundTrip_preservesOriginalSignal() {
-        FrequencyDomainAdapter adapter = new FrequencyDomainAdapter();
         double[] original = {1, 2, 3, 4};
 
         Complex[] transformed = SignalTransformer.fft(SignalTransformer.pad(original, 8));
