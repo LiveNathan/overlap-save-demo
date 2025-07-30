@@ -204,8 +204,6 @@ class ConvolutionTest {
         assertThat(result[2]).isEqualTo(0.05, within(precision));
     }
 
-    // Implement custom time domain convolution
-
     @Disabled
     @Test
     void apache() throws Exception {
