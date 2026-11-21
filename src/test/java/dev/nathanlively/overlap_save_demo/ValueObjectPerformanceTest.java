@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -32,7 +33,16 @@ import static org.assertj.core.api.Assertions.within;
  *   <li>Two parallel {@code double[]} (re/im) — the structure-of-arrays control.
  *       If value only matches SoA, the win was "stop allocating objects", not
  *       value objects specifically.</li>
+ *   <li>One interleaved {@code double[]} ({@code re, im, re, im, ...}) — the
+ *       layout real audio/DSP code most often uses, and the layout FFT libraries
+ *       tend to return.</li>
  * </ul>
+ *
+ * <p>A second phase ({@link #valueReduce_noStore_vsApacheAndSoA}) runs the same
+ * multiply without storing a result array at all — it just accumulates the sum
+ * of the products. If value matches SoA there but loses when storing into an
+ * array, the cost is the array store (no flattening); if it still loses, the
+ * multiply itself is slower. That separates scalarization from flattening.
  *
  * <p>Deliberately no "must be faster" assertion: this test logs numbers for the
  * blog post. A perf assertion would fail on a cold CI box and tell us nothing.
@@ -54,6 +64,7 @@ class ValueObjectPerformanceTest {
         Complex[] apache = multiplyApache(data.apacheA(), data.apacheB());
         ComplexValue[] value = multiplyValue(data.valueA(), data.valueB());
         double[][] soa = multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm());
+        double[] interleaved = multiplyInterleaved(data.interleavedA(), data.interleavedB());
 
         assertThat(value).hasSize(apache.length);
         for (int i = 0; i < apache.length; i++) {
@@ -61,6 +72,8 @@ class ValueObjectPerformanceTest {
             assertThat(value[i].imaginary()).isCloseTo(apache[i].getImaginary(), within(PRECISION));
             assertThat(soa[0][i]).isCloseTo(apache[i].getReal(), within(PRECISION));
             assertThat(soa[1][i]).isCloseTo(apache[i].getImaginary(), within(PRECISION));
+            assertThat(interleaved[2 * i]).isCloseTo(apache[i].getReal(), within(PRECISION));
+            assertThat(interleaved[2 * i + 1]).isCloseTo(apache[i].getImaginary(), within(PRECISION));
         }
     }
 
@@ -92,14 +105,16 @@ class ValueObjectPerformanceTest {
         List<List<Double>> apacheRuns = newRunsTable(sizes.length);
         List<List<Double>> valueRuns = newRunsTable(sizes.length);
         List<List<Double>> soaRuns = newRunsTable(sizes.length);
+        List<List<Double>> interleavedRuns = newRunsTable(sizes.length);
         List<List<Long>> apacheGcRuns = newGcTable(sizes.length);
         List<List<Long>> valueGcRuns = newGcTable(sizes.length);
         List<List<Long>> soaGcRuns = newGcTable(sizes.length);
+        List<List<Long>> interleavedGcRuns = newGcTable(sizes.length);
 
         double sink = 0.0; // checksum sink: keeps the JIT from deleting the warmup multiply
         for (int run = 0; run < OUTER_RUNS; run++) {
             log.info("--- Run {}/{} ---", run + 1, OUTER_RUNS);
-            log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Value vs Apache | GC Apache/Value/SoA");
+            log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Interleaved (ms) | Value vs Apache | GC Apache/Value/SoA/Interleaved");
             for (int s = 0; s < sizes.length; s++) {
                 TestData data = datasets.get(s);
 
@@ -108,6 +123,7 @@ class ValueObjectPerformanceTest {
                     sink += checksum(multiplyApache(data.apacheA(), data.apacheB()));
                     sink += checksum(multiplyValue(data.valueA(), data.valueB()));
                     sink += checksum(multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
+                    sink += checksum(multiplyInterleaved(data.interleavedA(), data.interleavedB()));
                 }
 
                 // Correctness first, on the warmed code: all three must agree.
@@ -127,34 +143,119 @@ class ValueObjectPerformanceTest {
                 double soaMs = medianMs(() -> multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
                 long soaGc = gcCount() - gcBefore;
 
+                gcBefore = gcCount();
+                double interleavedMs = medianMs(() -> multiplyInterleaved(data.interleavedA(), data.interleavedB()));
+                long interleavedGc = gcCount() - gcBefore;
+
                 apacheRuns.get(s).add(apacheMs);
                 valueRuns.get(s).add(valueMs);
                 soaRuns.get(s).add(soaMs);
+                interleavedRuns.get(s).add(interleavedMs);
                 apacheGcRuns.get(s).add(apacheGc);
                 valueGcRuns.get(s).add(valueGc);
                 soaGcRuns.get(s).add(soaGc);
+                interleavedGcRuns.get(s).add(interleavedGc);
 
-                log.info("{} | {} | {} | {} | {}x | {}/{}/{}",
-                        sizes[s], apacheMs, valueMs, soaMs, apacheMs / valueMs, apacheGc, valueGc, soaGc);
-                sink += apacheMs + valueMs + soaMs;
+                log.info("{} | {} | {} | {} | {} | {}x | {}/{}/{}/{}",
+                        sizes[s], apacheMs, valueMs, soaMs, interleavedMs, apacheMs / valueMs,
+                        apacheGc, valueGc, soaGc, interleavedGc);
+                sink += apacheMs + valueMs + soaMs + interleavedMs;
             }
         }
 
         log.info("=== Summary across {} runs: median (min-max), GC = total collections ===", OUTER_RUNS);
-        log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Value vs Apache | GC Apache/Value/SoA");
+        log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Interleaved (ms) | Value vs Apache | GC Apache/Value/SoA/Interleaved");
         for (int s = 0; s < sizes.length; s++) {
             double apacheMed = medianOf(apacheRuns.get(s));
             double valueMed = medianOf(valueRuns.get(s));
             double soaMed = medianOf(soaRuns.get(s));
-            log.info("{} | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {}x | {}/{}/{}",
+            double interleavedMed = medianOf(interleavedRuns.get(s));
+            log.info("{} | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {}x | {}/{}/{}/{}",
                     sizes[s],
                     apacheMed, Collections.min(apacheRuns.get(s)), Collections.max(apacheRuns.get(s)),
                     valueMed, Collections.min(valueRuns.get(s)), Collections.max(valueRuns.get(s)),
                     soaMed, Collections.min(soaRuns.get(s)), Collections.max(soaRuns.get(s)),
+                    interleavedMed, Collections.min(interleavedRuns.get(s)), Collections.max(interleavedRuns.get(s)),
                     apacheMed / valueMed,
-                    sumOf(apacheGcRuns.get(s)), sumOf(valueGcRuns.get(s)), sumOf(soaGcRuns.get(s)));
+                    sumOf(apacheGcRuns.get(s)), sumOf(valueGcRuns.get(s)),
+                    sumOf(soaGcRuns.get(s)), sumOf(interleavedGcRuns.get(s)));
         }
         log.info("Checksum sink (prevents dead-code elimination): {}", sink);
+    }
+
+    /**
+     * Phase 2: the same multiply, but the result is never stored — the products
+     * are accumulated into one sum. No result array is allocated by any arm, so
+     * the only allocation left is the per-element {@code Complex} / {@code ComplexValue}
+     * created by {@code multiply()} itself. If value matches SoA here but loses in
+     * the storing phase above, the cost is the array store (no flattening). If it
+     * still loses, the multiply itself is slower.
+     */
+    @Test
+    void valueReduce_noStore_vsApacheAndSoA() {
+        int[] sizes = {256, 4096, 16384};
+        List<TestData> datasets = new ArrayList<>();
+        for (int size : sizes) {
+            datasets.add(generate(size, 42L));
+        }
+
+        log.info("Reduce (no-store) kernel: {} outer runs, each run = median of {} reps, each rep = {} reduces",
+                OUTER_RUNS, TIMED_REPS, INNER_ITERATIONS);
+
+        List<List<Double>> apacheRuns = newRunsTable(sizes.length);
+        List<List<Double>> valueRuns = newRunsTable(sizes.length);
+        List<List<Double>> soaRuns = newRunsTable(sizes.length);
+        List<List<Double>> interleavedRuns = newRunsTable(sizes.length);
+
+        double sink = 0.0;
+        for (int run = 0; run < OUTER_RUNS; run++) {
+            log.info("--- Reduce run {}/{} ---", run + 1, OUTER_RUNS);
+            log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Interleaved (ms) | Value vs Apache");
+            for (int s = 0; s < sizes.length; s++) {
+                TestData data = datasets.get(s);
+
+                for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+                    sink += reduceApache(data.apacheA(), data.apacheB());
+                    sink += reduceValue(data.valueA(), data.valueB());
+                    sink += reduceSoA(data.aRe(), data.aIm(), data.bRe(), data.bIm());
+                    sink += reduceInterleaved(data.interleavedA(), data.interleavedB());
+                }
+                if (run == 0) {
+                    assertAllAgree(data);
+                }
+
+                double apacheMs = medianMs(() -> reduceApache(data.apacheA(), data.apacheB()));
+                double valueMs = medianMs(() -> reduceValue(data.valueA(), data.valueB()));
+                double soaMs = medianMs(() -> reduceSoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
+                double interleavedMs = medianMs(() -> reduceInterleaved(data.interleavedA(), data.interleavedB()));
+
+                apacheRuns.get(s).add(apacheMs);
+                valueRuns.get(s).add(valueMs);
+                soaRuns.get(s).add(soaMs);
+                interleavedRuns.get(s).add(interleavedMs);
+
+                log.info("{} | {} | {} | {} | {} | {}x",
+                        sizes[s], apacheMs, valueMs, soaMs, interleavedMs, apacheMs / valueMs);
+                sink += apacheMs + valueMs + soaMs + interleavedMs;
+            }
+        }
+
+        log.info("=== Reduce summary across {} runs: median (min-max) ===", OUTER_RUNS);
+        log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Interleaved (ms) | Value vs Apache");
+        for (int s = 0; s < sizes.length; s++) {
+            double apacheMed = medianOf(apacheRuns.get(s));
+            double valueMed = medianOf(valueRuns.get(s));
+            double soaMed = medianOf(soaRuns.get(s));
+            double interleavedMed = medianOf(interleavedRuns.get(s));
+            log.info("{} | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {}x",
+                    sizes[s],
+                    apacheMed, Collections.min(apacheRuns.get(s)), Collections.max(apacheRuns.get(s)),
+                    valueMed, Collections.min(valueRuns.get(s)), Collections.max(valueRuns.get(s)),
+                    soaMed, Collections.min(soaRuns.get(s)), Collections.max(soaRuns.get(s)),
+                    interleavedMed, Collections.min(interleavedRuns.get(s)), Collections.max(interleavedRuns.get(s)),
+                    apacheMed / valueMed);
+        }
+        log.info("Reduce sink: {}", sink);
     }
 
     private List<List<Double>> newRunsTable(int sizes) {
@@ -199,12 +300,22 @@ class ValueObjectPerformanceTest {
         Complex[] apache = multiplyApache(data.apacheA(), data.apacheB());
         ComplexValue[] value = multiplyValue(data.valueA(), data.valueB());
         double[][] soa = multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm());
+        double[] interleaved = multiplyInterleaved(data.interleavedA(), data.interleavedB());
         for (int i = 0; i < apache.length; i++) {
             assertThat(value[i].real()).isCloseTo(apache[i].getReal(), within(1e-9));
             assertThat(value[i].imaginary()).isCloseTo(apache[i].getImaginary(), within(1e-9));
             assertThat(soa[0][i]).isCloseTo(apache[i].getReal(), within(1e-9));
             assertThat(soa[1][i]).isCloseTo(apache[i].getImaginary(), within(1e-9));
+            assertThat(interleaved[2 * i]).isCloseTo(apache[i].getReal(), within(1e-9));
+            assertThat(interleaved[2 * i + 1]).isCloseTo(apache[i].getImaginary(), within(1e-9));
         }
+        // The no-store reduce must agree too. Tolerance stays looser here (1e-6)
+        // than the multiply check: all four arms now do one sum update per
+        // element, but rounding still accumulates over 16k terms.
+        double apacheSum = reduceApache(data.apacheA(), data.apacheB());
+        assertThat(reduceValue(data.valueA(), data.valueB())).isCloseTo(apacheSum, within(1e-6));
+        assertThat(reduceSoA(data.aRe(), data.aIm(), data.bRe(), data.bIm())).isCloseTo(apacheSum, within(1e-6));
+        assertThat(reduceInterleaved(data.interleavedA(), data.interleavedB())).isCloseTo(apacheSum, within(1e-6));
     }
 
     // Hand-rolled blackhole: storing each result in a volatile field forces it to
@@ -214,7 +325,7 @@ class ValueObjectPerformanceTest {
     private static volatile Object blackhole = new Object();
 
     /** Runs the work {@link #INNER_ITERATIONS} times per rep, {@link #TIMED_REPS} reps, returns the median rep time in ms. */
-    private double medianMs(java.util.function.Supplier<Object> work) {
+    private double medianMs(Supplier<Object> work) {
         List<Long> nanos = new ArrayList<>();
         for (int rep = 0; rep < TIMED_REPS; rep++) {
             long start = System.nanoTime();
@@ -261,6 +372,64 @@ class ValueObjectPerformanceTest {
         return new double[][]{outRe, outIm};
     }
 
+    // Interleaved layout: [re0, im0, re1, im1, ...]. One array, no objects,
+    // and each complex value's two halves sit next to each other in memory.
+    private double[] multiplyInterleaved(double[] a, double[] b) {
+        double[] out = new double[a.length];
+        for (int i = 0; i < a.length; i += 2) {
+            double aRe = a[i];
+            double aIm = a[i + 1];
+            double bRe = b[i];
+            double bIm = b[i + 1];
+            out[i] = aRe * bRe - aIm * bIm;
+            out[i + 1] = aRe * bIm + aIm * bRe;
+        }
+        return out;
+    }
+
+    // No-store reduces: multiply each pair and accumulate, allocating nothing
+    // except the per-element product object that multiply() itself creates.
+    private double reduceApache(Complex[] a, Complex[] b) {
+        double sum = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            Complex p = a[i].multiply(b[i]);
+            sum += p.getReal() + p.getImaginary();
+        }
+        return sum;
+    }
+
+    private double reduceValue(ComplexValue[] a, ComplexValue[] b) {
+        double sum = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            ComplexValue p = a[i].multiply(b[i]);
+            sum += p.real() + p.imaginary();
+        }
+        return sum;
+    }
+
+    // One sum update per element, like the Complex arms (sum += re + im):
+    // two dependent sum updates per element would make the reduction itself
+    // the bottleneck and hide the multiply cost being measured.
+    private double reduceSoA(double[] aRe, double[] aIm, double[] bRe, double[] bIm) {
+        double sum = 0.0;
+        for (int i = 0; i < aRe.length; i++) {
+            sum += (aRe[i] * bRe[i] - aIm[i] * bIm[i]) + (aRe[i] * bIm[i] + aIm[i] * bRe[i]);
+        }
+        return sum;
+    }
+
+    private double reduceInterleaved(double[] a, double[] b) {
+        double sum = 0.0;
+        for (int i = 0; i < a.length; i += 2) {
+            double aRe = a[i];
+            double aIm = a[i + 1];
+            double bRe = b[i];
+            double bIm = b[i + 1];
+            sum += (aRe * bRe - aIm * bIm) + (aRe * bIm + aIm * bRe);
+        }
+        return sum;
+    }
+
     private double checksum(Complex[] values) {
         double sum = 0.0;
         for (Complex v : values) {
@@ -288,12 +457,22 @@ class ValueObjectPerformanceTest {
         return sum;
     }
 
+    private double checksum(double[] values) {
+        double sum = 0.0;
+        for (double v : values) {
+            sum += v;
+        }
+        return sum;
+    }
+
     private TestData generate(int size, long seed) {
         Random random = new Random(seed); // deterministic: same inputs every run
         double[] aRe = new double[size];
         double[] aIm = new double[size];
         double[] bRe = new double[size];
         double[] bIm = new double[size];
+        double[] interleavedA = new double[2 * size];
+        double[] interleavedB = new double[2 * size];
         Complex[] apacheA = new Complex[size];
         Complex[] apacheB = new Complex[size];
         ComplexValue[] valueA = new ComplexValue[size];
@@ -303,16 +482,21 @@ class ValueObjectPerformanceTest {
             aIm[i] = random.nextDouble() * 2 - 1;
             bRe[i] = random.nextDouble() * 2 - 1;
             bIm[i] = random.nextDouble() * 2 - 1;
+            interleavedA[2 * i] = aRe[i];
+            interleavedA[2 * i + 1] = aIm[i];
+            interleavedB[2 * i] = bRe[i];
+            interleavedB[2 * i + 1] = bIm[i];
             apacheA[i] = Complex.ofCartesian(aRe[i], aIm[i]);
             apacheB[i] = Complex.ofCartesian(bRe[i], bIm[i]);
             valueA[i] = new ComplexValue(aRe[i], aIm[i]);
             valueB[i] = new ComplexValue(bRe[i], bIm[i]);
         }
-        return new TestData(apacheA, apacheB, valueA, valueB, aRe, aIm, bRe, bIm);
+        return new TestData(apacheA, apacheB, valueA, valueB, aRe, aIm, bRe, bIm, interleavedA, interleavedB);
     }
 
     private record TestData(Complex[] apacheA, Complex[] apacheB,
                             ComplexValue[] valueA, ComplexValue[] valueB,
-                            double[] aRe, double[] aIm, double[] bRe, double[] bIm) {
+                            double[] aRe, double[] aIm, double[] bRe, double[] bIm,
+                            double[] interleavedA, double[] interleavedB) {
     }
 }
