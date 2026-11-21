@@ -206,8 +206,8 @@ class ConvolutionTest {
         // The partitioned adapters run this through a 512-point FFT, whose
         // round-trip noise is ~1e-15 — just over the shared 1e-15 precision.
         assertThat(result[0]).isCloseTo(0.2, within(1e-14));
-        assertThat(result[1]).isEqualTo(0.2, within(precision));
-        assertThat(result[2]).isEqualTo(0.05, within(precision));
+        assertThat(result[1]).isEqualTo(0.2, within(1e-14));
+        assertThat(result[2]).isEqualTo(0.05, within(1e-14));
     }
 
     @Disabled
