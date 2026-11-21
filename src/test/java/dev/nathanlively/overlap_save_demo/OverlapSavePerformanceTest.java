@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 
 /**
  * Overlap-save version of the multiply experiment: long signal, short-to-
@@ -45,7 +44,8 @@ class OverlapSavePerformanceTest {
         Object[][] specs = {
                 {"32768/64", 32768, 64},
                 {"32768/512", 32768, 512},
-                {"48000/1024 (1s @ 48kHz)", 48000, 1024}
+                {"48000/1024 (1s @ 48kHz)", 48000, 1024},
+                {"48000/8192 (1s @ 48kHz)", 48000, 8192}
         };
         List<Case> cases = new ArrayList<>();
         for (Object[] spec : specs) {
@@ -69,9 +69,27 @@ class OverlapSavePerformanceTest {
             for (Convolution adapter : new Convolution[]{apache, interleaved}) {
                 double[] actual = adapter.with(testCase.signal(), testCase.kernel());
                 assertThat(actual.length).isEqualTo(expected.length);
+                // Count mismatches instead of failing on the first one, so
+                // the log names the case, the adapter, the first bad index
+                // and how many there are — that localises the bug.
+                int mismatches = 0;
+                int firstMismatch = -1;
                 for (int i = 0; i < expected.length; i++) {
-                    assertThat(actual[i]).isCloseTo(expected[i], within(1e-6));
+                    if (Math.abs(actual[i] - expected[i]) > 1e-6) {
+                        if (firstMismatch < 0) {
+                            firstMismatch = i;
+                        }
+                        mismatches++;
+                    }
                 }
+                if (mismatches > 0) {
+                    log.info("MISMATCH case={} adapter={} firstIndex={} actual={} expected={} totalMismatches={}/{}",
+                            testCase.name(), adapter.getClass().getSimpleName(), firstMismatch,
+                            actual[firstMismatch], expected[firstMismatch], mismatches, expected.length);
+                }
+                assertThat(mismatches)
+                        .as("case %s adapter %s", testCase.name(), adapter.getClass().getSimpleName())
+                        .isZero();
             }
         }
     }

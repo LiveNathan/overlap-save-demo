@@ -28,8 +28,12 @@ public class OverlapSaveAdapter implements Convolution {
                 resultLength - signal.length - blockStartIndex  // endPaddingAmount
         );
 
-        // Process blocks
-        int totalBlocks = (signal.length + blockSize - 1) / blockSize;
+        // Process blocks. The block count is based on the result length, not
+        // the signal length: the result is kernelLength-1 samples longer than
+        // the signal, and basing it on the signal left the tail unwritten
+        // (zeros) whenever the last block's overshoot past the signal was
+        // smaller than kernelLength-1 — e.g. 32768/64 lost its last 54 samples.
+        int totalBlocks = (resultLength + blockSize - 1) / blockSize;
         for (int blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
             int nextBlockStartIndex = blockIndex * blockSize;
 
