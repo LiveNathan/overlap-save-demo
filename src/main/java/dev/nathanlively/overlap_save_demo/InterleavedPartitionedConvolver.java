@@ -23,9 +23,6 @@ public class InterleavedPartitionedConvolver implements StreamingConvolver {
     private int position;
 
     public InterleavedPartitionedConvolver(double[] kernel, int partitionSize) {
-        if (kernel == null) {
-            throw new NullPointerException("kernel cannot be null");
-        }
         if (kernel.length == 0) {
             throw new NoDataException();
         }
@@ -57,9 +54,6 @@ public class InterleavedPartitionedConvolver implements StreamingConvolver {
 
     @Override
     public double[] processBlock(double[] block) {
-        if (block == null) {
-            throw new NullPointerException("block cannot be null");
-        }
         if (block.length != partitionSize) {
             throw new IllegalArgumentException("block must be partitionSize samples");
         }
