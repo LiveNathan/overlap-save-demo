@@ -28,7 +28,9 @@ class ConvolutionTest {
         return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(),
                 new FrequencyDomainAdapter(), new ValueFrequencyDomainAdapter(),
                 new InterleavedFrequencyDomainAdapter(), new OverlapSaveAdapter(),
-                new InterleavedOverlapSaveAdapter(), new VectorApiAdapter());
+                new InterleavedOverlapSaveAdapter(), new PartitionedConvolutionAdapter(),
+                new InterleavedPartitionedConvolutionAdapter(), new ValuePartitionedConvolutionAdapter(),
+                new VectorApiAdapter());
     }
 
     @ParameterizedTest

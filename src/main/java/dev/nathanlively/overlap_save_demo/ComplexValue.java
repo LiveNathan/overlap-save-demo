@@ -4,4 +4,8 @@ value record ComplexValue(double real, double imaginary) {
     ComplexValue multiply(ComplexValue complexValue) {
         return new ComplexValue(real * complexValue.real - imaginary * complexValue.imaginary, real * complexValue.imaginary + imaginary * complexValue.real);
     }
+
+    ComplexValue add(ComplexValue complexValue) {
+        return new ComplexValue(real + complexValue.real, imaginary + complexValue.imaginary);
+    }
 }
