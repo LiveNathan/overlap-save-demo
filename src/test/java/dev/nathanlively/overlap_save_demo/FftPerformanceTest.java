@@ -18,7 +18,8 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Apache's FFT in isolation, at the sizes the partitioned arms use.
+ * Apache's FFT in isolation, at the sizes the partitioned arms use,
+ * against the hand-rolled core.
  *
  * <p>The SoA arm's per-block work is one forward FFT-512 plus one inverse
  * FFT-512 plus a cheap Vector API multiply — so the question this test
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * split/merge conversions around it) versus the butterfly core
  * ({@code transformInPlace} on split-complex arrays).
  *
- * <p>Three paths per size, timed per call (1000 calls x 5 reps x 3 runs):
+ * <p>Five paths per size, timed per call (1000 calls x 5 reps x 3 runs):
  * <ul>
  *   <li>{@code apply} — exactly what the SoA arm calls today:
  *       {@code SignalTransformer.fft(pad(block))} then {@code ifft}.</li>
@@ -35,6 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       split-complex {@code double[2][n]} with fresh buffers per call.</li>
  *   <li>{@code in-place reused} — same, with one pair of buffers reused
  *       across calls (refilled each call).</li>
+ *   <li>{@code hand complex} — the hand-rolled core ({@link HandRolledFft}),
+ *       same split-complex shape, full twiddle table, buffers reused.</li>
+ *   <li>{@code hand real} — the hand-rolled real variants: one half-size
+ *       complex FFT plus O(N) packing per direction, buffers reused.</li>
  * </ul>
  * Plus a same-run SoA {@code processBlock} median, so the round-trip time
  * can be read as a share of a block. Times are microseconds: a round trip
@@ -78,6 +83,26 @@ class FftPerformanceTest {
         assertThat(maxAbsDiff(viaReused, padded)).isLessThan(1e-9);
         assertThat(maxAbsDiff(viaApply, viaInPlace)).isLessThan(1e-12);
         assertThat(maxAbsDiff(viaApply, viaReused)).isLessThan(1e-12);
+
+        // Hand-rolled paths agree with Apache, forward and round trip.
+        double[][] handComplex = {new double[fftSize], new double[fftSize]};
+        double[] handRe = new double[fftSize];
+        double[] handIm = new double[fftSize];
+        double[] handBack = new double[fftSize];
+        double[] viaHandComplex = roundTripHandComplex(block, fftSize, handComplex);
+        double[] viaHandReal = roundTripHandReal(padded, handRe, handIm, handBack);
+        assertThat(maxAbsDiff(viaHandComplex, padded)).isLessThan(1e-9);
+        assertThat(maxAbsDiff(viaHandReal, padded)).isLessThan(1e-9);
+        assertThat(maxAbsDiff(viaHandComplex, viaApply)).isLessThan(1e-9);
+        assertThat(maxAbsDiff(viaHandReal, viaApply)).isLessThan(1e-9);
+
+        Complex[] apacheSpectrum = SignalTransformer.fft(padded);
+        double[][] handSpectrum = {new double[fftSize], new double[fftSize]};
+        System.arraycopy(padded, 0, handSpectrum[0], 0, fftSize);
+        HandRolledFft.forward(handSpectrum[0], handSpectrum[1]);
+        assertThat(maxSpectrumDiff(handSpectrum[0], handSpectrum[1], apacheSpectrum)).isLessThan(1e-9);
+        HandRolledFft.forwardReal(padded, handRe, handIm);
+        assertThat(maxSpectrumDiff(handRe, handIm, apacheSpectrum)).isLessThan(1e-9);
     }
 
     @Test
@@ -90,22 +115,33 @@ class FftPerformanceTest {
             int blockLength = fftSize / 2;
             double[] block = deterministicBlock(blockLength);
             double[][] reused = {new double[fftSize], new double[fftSize]};
+            double[][] handComplex = {new double[fftSize], new double[fftSize]};
+            double[] handRe = new double[fftSize];
+            double[] handIm = new double[fftSize];
+            double[] handBack = new double[fftSize];
+            double[] handPadded = SignalTransformer.pad(block, fftSize);
 
             for (int i = 0; i < WARMUP_CALLS; i++) {
                 blackhole = roundTripApply(block, fftSize);
                 blackhole = roundTripInPlace(block, fftSize);
                 blackhole = roundTripInPlaceReused(block, fftSize, reused);
+                blackhole = roundTripHandComplex(block, fftSize, handComplex);
+                blackhole = roundTripHandReal(handPadded, handRe, handIm, handBack);
             }
 
             List<Long> applyNanos = new ArrayList<>();
             List<Long> inPlaceNanos = new ArrayList<>();
             List<Long> reusedNanos = new ArrayList<>();
+            List<Long> handComplexNanos = new ArrayList<>();
+            List<Long> handRealNanos = new ArrayList<>();
             long gcBefore = gcCount();
             for (int run = 0; run < OUTER_RUNS; run++) {
                 for (int rep = 0; rep < TIMED_REPS; rep++) {
                     applyNanos.addAll(timeRoundTrips(() -> roundTripApply(block, fftSize)));
                     inPlaceNanos.addAll(timeRoundTrips(() -> roundTripInPlace(block, fftSize)));
                     reusedNanos.addAll(timeRoundTrips(() -> roundTripInPlaceReused(block, fftSize, reused)));
+                    handComplexNanos.addAll(timeRoundTrips(() -> roundTripHandComplex(block, fftSize, handComplex)));
+                    handRealNanos.addAll(timeRoundTrips(() -> roundTripHandReal(handPadded, handRe, handIm, handBack)));
                 }
             }
             long gcDelta = gcCount() - gcBefore;
@@ -116,11 +152,15 @@ class FftPerformanceTest {
             }
             log.info("FFT-{} round trip | apply: median {} us | p95 {} us | max {} us | "
                             + "in-place: median {} us | p95 {} us | max {} us | "
-                            + "in-place reused: median {} us | p95 {} us | max {} us | GC {}",
+                            + "in-place reused: median {} us | p95 {} us | max {} us | "
+                            + "hand complex: median {} us | p95 {} us | max {} us | "
+                            + "hand real: median {} us | p95 {} us | max {} us | GC {}",
                     fftSize,
                     applyMedian, percentileMicros(applyNanos, 95), percentileMicros(applyNanos, 100),
                     percentileMicros(inPlaceNanos, 50), percentileMicros(inPlaceNanos, 95), percentileMicros(inPlaceNanos, 100),
                     percentileMicros(reusedNanos, 50), percentileMicros(reusedNanos, 95), percentileMicros(reusedNanos, 100),
+                    percentileMicros(handComplexNanos, 50), percentileMicros(handComplexNanos, 95), percentileMicros(handComplexNanos, 100),
+                    percentileMicros(handRealNanos, 50), percentileMicros(handRealNanos, 95), percentileMicros(handRealNanos, 100),
                     gcDelta);
         }
 
@@ -181,6 +221,21 @@ class FftPerformanceTest {
         return dataRI[0];
     }
 
+    private double[] roundTripHandComplex(double[] block, int fftSize, double[][] dataRI) {
+        System.arraycopy(block, 0, dataRI[0], 0, block.length);
+        Arrays.fill(dataRI[0], block.length, fftSize, 0.0);
+        Arrays.fill(dataRI[1], 0.0);
+        HandRolledFft.forward(dataRI[0], dataRI[1]);
+        HandRolledFft.inverse(dataRI[0], dataRI[1]);
+        return dataRI[0];
+    }
+
+    private double[] roundTripHandReal(double[] padded, double[] outRe, double[] outIm, double[] back) {
+        HandRolledFft.forwardReal(padded, outRe, outIm);
+        HandRolledFft.inverseReal(outRe, outIm, back);
+        return back;
+    }
+
     private List<Long> timeRoundTrips(Supplier<double[]> work) {
         List<Long> nanos = new ArrayList<>(CALLS_PER_REP);
         for (int i = 0; i < CALLS_PER_REP; i++) {
@@ -210,6 +265,17 @@ class FftPerformanceTest {
         double max = 0.0;
         for (int i = 0; i < a.length; i++) {
             max = Math.max(max, Math.abs(a[i] - b[i]));
+        }
+        return max;
+    }
+
+    private double maxSpectrumDiff(double[] re, double[] im, Complex[] spectrum) {
+        assertThat(re.length).isEqualTo(spectrum.length);
+        assertThat(im.length).isEqualTo(spectrum.length);
+        double max = 0.0;
+        for (int i = 0; i < spectrum.length; i++) {
+            max = Math.max(max, Math.abs(re[i] - spectrum[i].getReal()));
+            max = Math.max(max, Math.abs(im[i] - spectrum[i].getImaginary()));
         }
         return max;
     }
