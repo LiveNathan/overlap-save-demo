@@ -152,8 +152,20 @@ public class NonUniformPartitionedConvolver implements StreamingConvolver {
             throw new IllegalStateException("stage output landed behind the emit cursor at " + pos);
         }
         ensureRoom(pos + chunk.length);
+        int startIndex = pos - outStart;
+        int validEnd = outEnd - outStart;
+        // Indices beyond the valid pending data hold already-emitted
+        // samples: emitBlock shifts the remainder left but never clears
+        // what it consumed. Clear the span this chunk will touch before
+        // accumulating, or it would add onto stale values — this corrupted
+        // exactly block 1 on short kernels, where the second stage
+        // contributes nothing to mask it. The span inside the valid data
+        // is a genuine second contribution and accumulates as before.
+        for (int i = Math.max(validEnd, startIndex); i < startIndex + chunk.length; i++) {
+            out[i] = 0.0;
+        }
         for (int i = 0; i < chunk.length; i++) {
-            out[pos - outStart + i] += chunk[i];
+            out[startIndex + i] += chunk[i];
         }
         outEnd = Math.max(outEnd, pos + chunk.length);
     }

@@ -30,7 +30,8 @@ class ConvolutionTest {
                 new InterleavedFrequencyDomainAdapter(), new OverlapSaveAdapter(),
                 new InterleavedOverlapSaveAdapter(), new PartitionedConvolutionAdapter(),
                 new InterleavedPartitionedConvolutionAdapter(), new ValuePartitionedConvolutionAdapter(),
-                new NonUniformPartitionedConvolutionAdapter(), new VectorApiAdapter());
+                new NonUniformPartitionedConvolutionAdapter(), new SoAPartitionedConvolutionAdapter(),
+                new VectorApiAdapter());
     }
 
     @ParameterizedTest
