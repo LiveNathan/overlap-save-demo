@@ -30,6 +30,8 @@ import java.util.Arrays;
 public class RealFftSoAPartitionedConvolver implements StreamingConvolver {
     private static final VectorSpecies<Double> SPECIES = DoubleVector.SPECIES_PREFERRED;
 
+    private final HandRolledFft fft = new HandRolledFft();
+
     private final int partitionSize;
     private final int fftSize;
     private final int partitions;
@@ -60,7 +62,7 @@ public class RealFftSoAPartitionedConvolver implements StreamingConvolver {
             System.arraycopy(paddedKernel, j * partitionSize, chunk, 0, partitionSize);
             double[] re = new double[fftSize];
             double[] im = new double[fftSize];
-            HandRolledFft.forwardReal(chunk, re, im);
+            fft.forwardReal(chunk, re, im);
             kernelSpectraRe[j] = re;
             kernelSpectraIm[j] = im;
         }
@@ -88,7 +90,7 @@ public class RealFftSoAPartitionedConvolver implements StreamingConvolver {
         System.arraycopy(block, 0, paddedBlock, 0, partitionSize);
         double[] inputRe = new double[fftSize];
         double[] inputIm = new double[fftSize];
-        HandRolledFft.forwardReal(paddedBlock, inputRe, inputIm);
+        fft.forwardReal(paddedBlock, inputRe, inputIm);
         delayLineRe[position] = inputRe;
         delayLineIm[position] = inputIm;
 
@@ -104,7 +106,7 @@ public class RealFftSoAPartitionedConvolver implements StreamingConvolver {
         // Inverse real transform straight into the block result — no
         // merge, no Complex[], no copy.
         double[] blockResult = new double[fftSize];
-        HandRolledFft.inverseReal(sumRe, sumIm, blockResult);
+        fft.inverseReal(sumRe, sumIm, blockResult);
         double[] output = new double[partitionSize];
         for (int i = 0; i < partitionSize; i++) {
             output[i] = blockResult[i] + overlap[i];

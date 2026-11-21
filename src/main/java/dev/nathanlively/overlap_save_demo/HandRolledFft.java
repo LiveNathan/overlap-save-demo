@@ -1,7 +1,7 @@
 package dev.nathanlively.overlap_save_demo;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hand-rolled radix-2 FFT on split-complex arrays, written to find out
@@ -19,25 +19,31 @@ import java.util.Map;
  *       transform.</li>
  * </ul>
  * Normalization matches Apache STD: forward unscaled, inverse scaled by
- * 1/N. Twiddle plans are cached per size; a plan holds N/2 roots.
+ * 1/N. Twiddle plans are cached per size, per instance; a plan holds N/2 roots.
  *
- * <p>Prototype: measured head to head against Apache in
- * {@code FftPerformanceTest} before any convolver arm is wired to it.
+ * <p>Measured head to head against Apache in {@code FftPerformanceTest};
+ * now wired to {@code RealFftSoAPartitionedConvolver} — see
+ * {@code PERFORMANCE_RESULTS.md} for the numbers.
+ *
+ * <p>Instances are safe to share across threads as long as each call uses
+ * its own buffers: the only shared state is the plan cache, and plans
+ * are immutable once built.
  */
 public final class HandRolledFft {
-    private HandRolledFft() {
+    /** Creates an FFT with an empty plan cache; plans are built lazily per size. */
+    public HandRolledFft() {
     }
 
     private record Plan(double[] wRe, double[] wImForward, double[] wImInverse) {
     }
 
-    private static final Map<Integer, Plan> PLANS = new HashMap<>();
+    private final Map<Integer, Plan> plans = new ConcurrentHashMap<>();
 
-    private static Plan planFor(int size) {
-        return PLANS.computeIfAbsent(size, HandRolledFft::buildPlan);
+    private Plan planFor(int size) {
+        return plans.computeIfAbsent(size, this::buildPlan);
     }
 
-    private static Plan buildPlan(int size) {
+    private Plan buildPlan(int size) {
         if (size < 1 || (size & (size - 1)) != 0) {
             throw new IllegalArgumentException("size must be a power of two >= 1");
         }
@@ -55,16 +61,16 @@ public final class HandRolledFft {
     }
 
     /** Complex forward transform, in place. Unscaled, like Apache STD. */
-    public static void forward(double[] re, double[] im) {
+    public void forward(double[] re, double[] im) {
         transform(re, im, false);
     }
 
     /** Complex inverse transform, in place. Scaled by 1/N, like Apache STD. */
-    public static void inverse(double[] re, double[] im) {
+    public void inverse(double[] re, double[] im) {
         transform(re, im, true);
     }
 
-    private static void transform(double[] re, double[] im, boolean inverse) {
+    private void transform(double[] re, double[] im, boolean inverse) {
         int n = re.length;
         if (im.length != n) {
             throw new IllegalArgumentException("real and imaginary parts must have the same length");
@@ -102,7 +108,7 @@ public final class HandRolledFft {
         }
     }
 
-    private static void bitReverse(double[] re, double[] im) {
+    private void bitReverse(double[] re, double[] im) {
         int n = re.length;
         for (int i = 1, j = 0; i < n; i++) {
             int bit = n >> 1;
@@ -129,10 +135,15 @@ public final class HandRolledFft {
      * O = -i (Z - conj(Z[M-k])) / 2) and combine with the twiddle,
      * X[k] = E[k] + W_N^k O[k], X[k+M] = E[k] - W_N^k O[k].
      */
-    public static void forwardReal(double[] in, double[] outRe, double[] outIm) {
+    public void forwardReal(double[] in, double[] outRe, double[] outIm) {
         int n = in.length;
         if (outRe.length != n || outIm.length != n) {
             throw new IllegalArgumentException("input and output must have the same length");
+        }
+        if (n == 1) {
+            outRe[0] = in[0];
+            outIm[0] = 0.0;
+            return;
         }
         int m = n / 2;
         double[] pr = new double[m];
@@ -178,10 +189,14 @@ public final class HandRolledFft {
      * samples from the imaginary parts. Scaled by 1/N overall, matching
      * Apache STD.
      */
-    public static void inverseReal(double[] inRe, double[] inIm, double[] out) {
+    public void inverseReal(double[] inRe, double[] inIm, double[] out) {
         int n = inRe.length;
         if (inIm.length != n || out.length != n) {
             throw new IllegalArgumentException("input and output must have the same length");
+        }
+        if (n == 1) {
+            out[0] = inRe[0];
+            return;
         }
         int m = n / 2;
         double[] zr = new double[m];

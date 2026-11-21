@@ -67,6 +67,8 @@ class FftPerformanceTest {
 
     private static volatile Object blackhole;
 
+    private final HandRolledFft handRolledFft = new HandRolledFft();
+
     @Test
     void fftRoundTrip_agreesWithSignalTransformer() {
         int fftSize = 512;
@@ -99,9 +101,9 @@ class FftPerformanceTest {
         Complex[] apacheSpectrum = SignalTransformer.fft(padded);
         double[][] handSpectrum = {new double[fftSize], new double[fftSize]};
         System.arraycopy(padded, 0, handSpectrum[0], 0, fftSize);
-        HandRolledFft.forward(handSpectrum[0], handSpectrum[1]);
+        handRolledFft.forward(handSpectrum[0], handSpectrum[1]);
         assertThat(maxSpectrumDiff(handSpectrum[0], handSpectrum[1], apacheSpectrum)).isLessThan(1e-9);
-        HandRolledFft.forwardReal(padded, handRe, handIm);
+        handRolledFft.forwardReal(padded, handRe, handIm);
         assertThat(maxSpectrumDiff(handRe, handIm, apacheSpectrum)).isLessThan(1e-9);
     }
 
@@ -225,14 +227,14 @@ class FftPerformanceTest {
         System.arraycopy(block, 0, dataRI[0], 0, block.length);
         Arrays.fill(dataRI[0], block.length, fftSize, 0.0);
         Arrays.fill(dataRI[1], 0.0);
-        HandRolledFft.forward(dataRI[0], dataRI[1]);
-        HandRolledFft.inverse(dataRI[0], dataRI[1]);
+        handRolledFft.forward(dataRI[0], dataRI[1]);
+        handRolledFft.inverse(dataRI[0], dataRI[1]);
         return dataRI[0];
     }
 
     private double[] roundTripHandReal(double[] padded, double[] outRe, double[] outIm, double[] back) {
-        HandRolledFft.forwardReal(padded, outRe, outIm);
-        HandRolledFft.inverseReal(outRe, outIm, back);
+        handRolledFft.forwardReal(padded, outRe, outIm);
+        handRolledFft.inverseReal(outRe, outIm, back);
         return back;
     }
 
