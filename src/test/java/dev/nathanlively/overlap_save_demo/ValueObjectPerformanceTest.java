@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,6 +43,9 @@ class ValueObjectPerformanceTest {
     private static final int WARMUP_ITERATIONS = 20;
     private static final int INNER_ITERATIONS = 100;
     private static final int TIMED_REPS = 5;
+    // Whole-sweep repetitions: the sweep runs this many times in one JVM so the
+    // summary can show run-to-run spread instead of a single median.
+    private static final int OUTER_RUNS = 5;
 
     @Test
     void valueMultiply_matchesApacheMultiply() {
@@ -63,40 +68,131 @@ class ValueObjectPerformanceTest {
     void valueObjects_haveValueSemantics() {
         // The demo for the blog post: == compares fields, not identity.
         // Two separately constructed values with the same fields are ==.
-        assertThat(new ComplexValue(1.0, 2.0).equals(new ComplexValue(1.0, 2.0))).isTrue();
-        assertThat(new ComplexValue(1.0, 2.0).equals(new ComplexValue(1.0, 3.0))).isFalse();
+        // NB: == here is the whole point, not a mistake — for a value object it
+        // compares fields, for an ordinary record it would compare identity and
+        // fail. Do not let the IDE "fix" this to .equals(): equals() would pass
+        // for a plain record too, so it would prove nothing about value semantics.
+        assertThat(new ComplexValue(1.0, 2.0) == new ComplexValue(1.0, 2.0)).isTrue();
+        assertThat(new ComplexValue(1.0, 2.0) == new ComplexValue(1.0, 3.0)).isFalse();
     }
 
     @Test
     void valueMultiply_performance_vsApacheAndSoA() {
         int[] sizes = {256, 4096, 16384};
-
-        log.info("Multiply kernel: median of {} reps, each rep = {} multiplies", TIMED_REPS, INNER_ITERATIONS);
-        log.info("Size | Apache Complex (ms) | ComplexValue (ms) | SoA double[] (ms) | Value vs Apache");
-        log.info("-----|---------------------|-------------------|-------------------|----------------");
-
-        double sink = 0.0; // checksum sink: keeps the JIT from deleting the multiply
+        // Same inputs for every outer run, so runs are directly comparable.
+        List<TestData> datasets = new ArrayList<>();
         for (int size : sizes) {
-            TestData data = generate(size, 42L);
+            datasets.add(generate(size, 42L));
+        }
 
-            // Warmup: same data, same code paths as the timed section.
-            for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                sink += checksum(multiplyApache(data.apacheA(), data.apacheB()));
-                sink += checksum(multiplyValue(data.valueA(), data.valueB()));
-                sink += checksum(multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
+        log.info("Multiply kernel: {} outer runs, each run = median of {} reps, each rep = {} multiplies",
+                OUTER_RUNS, TIMED_REPS, INNER_ITERATIONS);
+
+        // One median (and one GC delta) per outer run, per size, per arm.
+        List<List<Double>> apacheRuns = newRunsTable(sizes.length);
+        List<List<Double>> valueRuns = newRunsTable(sizes.length);
+        List<List<Double>> soaRuns = newRunsTable(sizes.length);
+        List<List<Long>> apacheGcRuns = newGcTable(sizes.length);
+        List<List<Long>> valueGcRuns = newGcTable(sizes.length);
+        List<List<Long>> soaGcRuns = newGcTable(sizes.length);
+
+        double sink = 0.0; // checksum sink: keeps the JIT from deleting the warmup multiply
+        for (int run = 0; run < OUTER_RUNS; run++) {
+            log.info("--- Run {}/{} ---", run + 1, OUTER_RUNS);
+            log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Value vs Apache | GC Apache/Value/SoA");
+            for (int s = 0; s < sizes.length; s++) {
+                TestData data = datasets.get(s);
+
+                // Warmup: same data, same code paths as the timed section.
+                for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+                    sink += checksum(multiplyApache(data.apacheA(), data.apacheB()));
+                    sink += checksum(multiplyValue(data.valueA(), data.valueB()));
+                    sink += checksum(multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
+                }
+
+                // Correctness first, on the warmed code: all three must agree.
+                if (run == 0) {
+                    assertAllAgree(data);
+                }
+
+                long gcBefore = gcCount();
+                double apacheMs = medianMs(() -> multiplyApache(data.apacheA(), data.apacheB()));
+                long apacheGc = gcCount() - gcBefore;
+
+                gcBefore = gcCount();
+                double valueMs = medianMs(() -> multiplyValue(data.valueA(), data.valueB()));
+                long valueGc = gcCount() - gcBefore;
+
+                gcBefore = gcCount();
+                double soaMs = medianMs(() -> multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
+                long soaGc = gcCount() - gcBefore;
+
+                apacheRuns.get(s).add(apacheMs);
+                valueRuns.get(s).add(valueMs);
+                soaRuns.get(s).add(soaMs);
+                apacheGcRuns.get(s).add(apacheGc);
+                valueGcRuns.get(s).add(valueGc);
+                soaGcRuns.get(s).add(soaGc);
+
+                log.info("{} | {} | {} | {} | {}x | {}/{}/{}",
+                        sizes[s], apacheMs, valueMs, soaMs, apacheMs / valueMs, apacheGc, valueGc, soaGc);
+                sink += apacheMs + valueMs + soaMs;
             }
+        }
 
-            // Correctness first, on the warmed code: all three must agree.
-            assertAllAgree(data);
-
-            double apacheMs = medianMs(() -> multiplyApache(data.apacheA(), data.apacheB()));
-            double valueMs = medianMs(() -> multiplyValue(data.valueA(), data.valueB()));
-            double soaMs = medianMs(() -> multiplySoA(data.aRe(), data.aIm(), data.bRe(), data.bIm()));
-
-            log.info("{} | {} | {} | {} | {}x", size, apacheMs, valueMs, soaMs, apacheMs / valueMs);
-            sink += apacheMs + valueMs + soaMs;
+        log.info("=== Summary across {} runs: median (min-max), GC = total collections ===", OUTER_RUNS);
+        log.info("Size | Apache (ms) | Value (ms) | SoA (ms) | Value vs Apache | GC Apache/Value/SoA");
+        for (int s = 0; s < sizes.length; s++) {
+            double apacheMed = medianOf(apacheRuns.get(s));
+            double valueMed = medianOf(valueRuns.get(s));
+            double soaMed = medianOf(soaRuns.get(s));
+            log.info("{} | {} ({}-{}) | {} ({}-{}) | {} ({}-{}) | {}x | {}/{}/{}",
+                    sizes[s],
+                    apacheMed, Collections.min(apacheRuns.get(s)), Collections.max(apacheRuns.get(s)),
+                    valueMed, Collections.min(valueRuns.get(s)), Collections.max(valueRuns.get(s)),
+                    soaMed, Collections.min(soaRuns.get(s)), Collections.max(soaRuns.get(s)),
+                    apacheMed / valueMed,
+                    sumOf(apacheGcRuns.get(s)), sumOf(valueGcRuns.get(s)), sumOf(soaGcRuns.get(s)));
         }
         log.info("Checksum sink (prevents dead-code elimination): {}", sink);
+    }
+
+    private List<List<Double>> newRunsTable(int sizes) {
+        List<List<Double>> table = new ArrayList<>();
+        for (int i = 0; i < sizes; i++) {
+            table.add(new ArrayList<>());
+        }
+        return table;
+    }
+
+    private List<List<Long>> newGcTable(int sizes) {
+        List<List<Long>> table = new ArrayList<>();
+        for (int i = 0; i < sizes; i++) {
+            table.add(new ArrayList<>());
+        }
+        return table;
+    }
+
+    private double medianOf(List<Double> values) {
+        List<Double> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        return sorted.get(sorted.size() / 2);
+    }
+
+    private long sumOf(List<Long> values) {
+        long sum = 0;
+        for (long v : values) {
+            sum += v;
+        }
+        return sum;
+    }
+
+    /** Total GC collections across all collectors (-1, "undefined", excluded). */
+    private long gcCount() {
+        return ManagementFactory.getGarbageCollectorMXBeans().stream()
+                .mapToLong(GarbageCollectorMXBean::getCollectionCount)
+                .filter(c -> c >= 0)
+                .sum();
     }
 
     private void assertAllAgree(TestData data) {
