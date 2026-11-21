@@ -46,7 +46,7 @@ class PartitionedConvolutionPerformanceTest {
     private static final int TIMED_REPS = 5;
     private static final int OUTER_RUNS = 3;
 
-    private static volatile Object blackhole;
+    private static volatile Object blackhole = new Object();
 
     private record Case(String name, int signalLength, int kernelLength, double[] signal, double[] kernel) {
     }
