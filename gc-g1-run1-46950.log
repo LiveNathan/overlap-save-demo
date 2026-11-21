@@ -1,0 +1,25 @@
+[2026-11-20T21:53:04.613-0600][0.004s][info][gc] Using The Z Garbage Collector
+[2026-11-20T21:53:05.628-0600][1.019s][info][gc] GC(0) Major Collection (Warmup)
+[2026-11-20T21:53:05.643-0600][1.033s][info][gc] GC(0) Major Collection (Warmup) 1480M(10%)->52M(0%) 0.014s
+[2026-11-20T21:53:07.222-0600][2.613s][info][gc] GC(1) Major Collection (Warmup)
+[2026-11-20T21:53:07.234-0600][2.625s][info][gc] GC(1) Major Collection (Warmup) 2962M(20%)->148M(1%) 0.012s
+[2026-11-20T21:53:08.017-0600][3.408s][info][gc] GC(2) Major Collection (Warmup)
+[2026-11-20T21:53:08.030-0600][3.420s][info][gc] GC(2) Major Collection (Warmup) 4464M(30%)->186M(1%) 0.012s
+[2026-11-20T21:53:11.288-0600][6.679s][info][gc] GC(3) Major Collection (Proactive)
+[2026-11-20T21:53:11.316-0600][6.707s][info][gc] GC(3) Major Collection (Proactive) 11466M(78%)->240M(2%) 0.033s
+[2026-11-20T21:53:14.922-0600][10.312s][info][gc] GC(4) Major Collection (Proactive)
+[2026-11-20T21:53:14.944-0600][10.335s][info][gc] GC(4) Major Collection (Proactive) 12104M(82%)->314M(2%) 0.023s
+[2026-11-20T21:53:17.278-0600][12.668s][info][gc] GC(5) Minor Collection (High Usage)
+[2026-11-20T21:53:17.293-0600][12.684s][info][gc] GC(5) Minor Collection (High Usage) 14050M(95%)->260M(2%) 0.016s
+[2026-11-20T21:53:17.490-0600][12.881s][info][gc] GC(6) Major Collection (Proactive)
+[2026-11-20T21:53:17.512-0600][12.903s][info][gc] GC(6) Major Collection (Proactive) 2576M(17%)->454M(3%) 0.022s
+[2026-11-20T21:53:19.760-0600][15.151s][info][gc] GC(7) Major Collection (Proactive)
+[2026-11-20T21:53:19.817-0600][15.207s][info][gc] GC(7) Major Collection (Proactive) 10516M(71%)->158M(1%) 0.056s
+[2026-11-20T21:53:23.112-0600][18.503s][info][gc] GC(8) Minor Collection (High Usage)
+[2026-11-20T21:53:23.121-0600][18.512s][info][gc] GC(8) Minor Collection (High Usage) 14018M(95%)->110M(1%) 0.009s
+[2026-11-20T21:53:25.818-0600][21.208s][info][gc] GC(9) Major Collection (Proactive)
+[2026-11-20T21:53:25.839-0600][21.230s][info][gc] GC(9) Major Collection (Proactive) 12884M(87%)->174M(1%) 0.022s
+[2026-11-20T21:53:28.602-0600][23.992s][info][gc] GC(10) Minor Collection (High Usage)
+[2026-11-20T21:53:28.623-0600][24.014s][info][gc] GC(10) Minor Collection (High Usage) 13972M(95%)->114M(1%) 0.021s
+[2026-11-20T21:53:30.469-0600][25.859s][info][gc] GC(11) Major Collection (Proactive)
+[2026-11-20T21:53:30.490-0600][25.881s][info][gc] GC(11) Major Collection (Proactive) 11628M(79%)->272M(2%) 0.022s

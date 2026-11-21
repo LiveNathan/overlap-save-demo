@@ -1,0 +1,3 @@
+[2026-11-20T21:46:00.719-0600][0.003s][info][gc] Using The Z Garbage Collector
+[2026-11-20T21:46:01.989-0600][1.273s][info][gc] GC(0) Major Collection (Metadata GC Threshold)
+[2026-11-20T21:46:02.041-0600][1.324s][info][gc] GC(0) Major Collection (Metadata GC Threshold) 260M(2%)->36M(0%) 0.052s
