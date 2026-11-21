@@ -26,7 +26,9 @@ class ConvolutionTest {
 
     static Stream<Convolution> allImplementations() {
         return Stream.of(new ApacheAdapter(), new TimeDomainAdapter(),
-                new FrequencyDomainAdapter(), new OverlapSaveAdapter(), new VectorApiAdapter());
+                new FrequencyDomainAdapter(), new ValueFrequencyDomainAdapter(),
+                new InterleavedFrequencyDomainAdapter(), new OverlapSaveAdapter(),
+                new InterleavedOverlapSaveAdapter(), new VectorApiAdapter());
     }
 
     @ParameterizedTest

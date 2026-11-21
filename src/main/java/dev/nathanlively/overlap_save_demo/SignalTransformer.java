@@ -69,6 +69,80 @@ public class SignalTransformer {
         return result;
     }
 
+    /**
+     * Same element-wise product, over value records.
+     */
+    static ComplexValue[] multiplyValue(ComplexValue[] transform1, ComplexValue[] transform2) {
+        if (transform1.length != transform2.length) {
+            throw new IllegalArgumentException("Transform arrays must have same length");
+        }
+
+        ComplexValue[] result = new ComplexValue[transform1.length];
+        for (int i = 0; i < transform1.length; i++) {
+            result[i] = transform1[i].multiply(transform2[i]);
+        }
+        return result;
+    }
+
+    /**
+     * Same element-wise product, over one interleaved flat array
+     * ({@code [re, im, re, im, ...]}). No object is created per element.
+     */
+    public static double[] multiplyInterleaved(double[] transform1, double[] transform2) {
+        if (transform1.length != transform2.length) {
+            throw new IllegalArgumentException("Transform arrays must have same length");
+        }
+
+        double[] result = new double[transform1.length];
+        for (int i = 0; i < transform1.length; i += 2) {
+            double aRe = transform1[i];
+            double aIm = transform1[i + 1];
+            double bRe = transform2[i];
+            double bIm = transform2[i + 1];
+            result[i] = aRe * bRe - aIm * bIm;
+            result[i + 1] = aRe * bIm + aIm * bRe;
+        }
+        return result;
+    }
+
+    // Boundary conversions between the FFT's Complex[] and the multiply
+    // stage's representations. Each is O(N), the same order as the multiply
+    // itself — whether they pay for themselves is what the end-to-end test
+    // measures, so they live here next to the multiply they serve.
+
+     static ComplexValue[] toComplexValue(Complex[] transform) {
+        ComplexValue[] result = new ComplexValue[transform.length];
+        for (int i = 0; i < transform.length; i++) {
+            result[i] = new ComplexValue(transform[i].getReal(), transform[i].getImaginary());
+        }
+        return result;
+    }
+
+     static Complex[] toComplex(ComplexValue[] transform) {
+        Complex[] result = new Complex[transform.length];
+        for (int i = 0; i < transform.length; i++) {
+            result[i] = Complex.ofCartesian(transform[i].real(), transform[i].imaginary());
+        }
+        return result;
+    }
+
+    public static double[] toInterleaved(Complex[] transform) {
+        double[] result = new double[2 * transform.length];
+        for (int i = 0; i < transform.length; i++) {
+            result[2 * i] = transform[i].getReal();
+            result[2 * i + 1] = transform[i].getImaginary();
+        }
+        return result;
+    }
+
+    public static Complex[] fromInterleaved(double[] transform) {
+        Complex[] result = new Complex[transform.length / 2];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = Complex.ofCartesian(transform[2 * i], transform[2 * i + 1]);
+        }
+        return result;
+    }
+
     public static void validate(double[] signal, double[] kernel) {
         Objects.requireNonNull(signal, "signal cannot be null");
         Objects.requireNonNull(kernel, "kernel cannot be null");
