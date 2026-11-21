@@ -5,6 +5,7 @@ import org.apache.commons.math4.legacy.exception.NoDataException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiFunction;
 
 /**
  * Non-uniform partitioned convolution (Sheta / Gardner / Wefers): the kernel
@@ -28,11 +29,14 @@ import java.util.List;
  * most at the block boundary its first output sample is due (clearance >= 0).
  *
  * <p>The multiply representation is fixed at interleaved flat
- * {@code double[]}: the per-block measurement showed it 6.6x faster than
- * Apache {@code Complex} and 3.4x faster than value records for uniform
- * partitions, so the layout — not the representation — is the variable
- * under test here. Short kernels are zero-padded to the layout total, so
- * the layout is fixed even for tiny test cases.
+ * {@code double[]} for the default stage: the per-block measurement showed
+ * it 6.6x faster than Apache {@code Complex} and 3.4x faster than value
+ * records for uniform partitions, so the layout — not the representation —
+ * is the variable under test here. The stage convolver is injectable
+ * through the second constructor, so the same layout can be re-run under
+ * a different FFT (the real-FFT re-test supplies RealFft stages).
+ * Short kernels are zero-padded to the layout total, so the layout is
+ * fixed even for tiny test cases.
  */
 public class NonUniformPartitionedConvolver implements StreamingConvolver {
     private final int blockSize;
@@ -46,14 +50,14 @@ public class NonUniformPartitionedConvolver implements StreamingConvolver {
     private int inputFed;
 
     private static final class Stage {
-        final InterleavedPartitionedConvolver convolver;
+        final StreamingConvolver convolver;
         final int partitionSize;
         final int offset;
         final double[] inputBuffer;
         int filled;
         int chunkIndex;
 
-        Stage(InterleavedPartitionedConvolver convolver, int partitionSize, int offset) {
+        Stage(StreamingConvolver convolver, int partitionSize, int offset) {
             this.convolver = convolver;
             this.partitionSize = partitionSize;
             this.offset = offset;
@@ -69,6 +73,19 @@ public class NonUniformPartitionedConvolver implements StreamingConvolver {
      *               in kernel order, sizes powers of two
      */
     public NonUniformPartitionedConvolver(double[] kernel, int blockSize, int[][] groups) {
+        this(kernel, blockSize, groups, InterleavedPartitionedConvolver::new);
+    }
+
+    /**
+     * Same layout, with the per-stage convolver supplied by the caller —
+     * the variable under test when one layout is re-run under a
+     * different FFT.
+     *
+     * @param stageFactory builds one stage convolver from its kernel slice
+     *                     and partition size
+     */
+    public NonUniformPartitionedConvolver(double[] kernel, int blockSize, int[][] groups,
+                                          BiFunction<double[], Integer, StreamingConvolver> stageFactory) {
         if (kernel.length == 0) {
             throw new NoDataException();
         }
@@ -114,7 +131,7 @@ public class NonUniformPartitionedConvolver implements StreamingConvolver {
                 throw new IllegalArgumentException("stage offset " + offset + " is not a multiple of its partition size " + size);
             }
             double[] slice = Arrays.copyOfRange(paddedKernel, offset, offset + count * size);
-            stages[s] = new Stage(new InterleavedPartitionedConvolver(slice, size), size, offset);
+            stages[s] = new Stage(stageFactory.apply(slice, size), size, offset);
             offset += count * size;
         }
     }

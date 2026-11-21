@@ -37,6 +37,10 @@ public class NonUniformPartitionedConvolutionAdapter implements Convolution {
         return blockSize;
     }
 
+    protected int[][] groups() {
+        return deepCopy(groups);
+    }
+
     @Override
     public double[] with(double[] signal, double[] kernel) {
         SignalTransformer.validate(signal, kernel);

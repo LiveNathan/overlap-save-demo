@@ -32,6 +32,7 @@ class ConvolutionTest {
                 new InterleavedPartitionedConvolutionAdapter(), new ValuePartitionedConvolutionAdapter(),
                 new NonUniformPartitionedConvolutionAdapter(), new SoAPartitionedConvolutionAdapter(),
                 new InPlaceSoAPartitionedConvolutionAdapter(), new RealFftSoAPartitionedConvolutionAdapter(),
+                new RealFftNonUniformPartitionedConvolutionAdapter(),
                 new VectorApiAdapter());
     }
 
