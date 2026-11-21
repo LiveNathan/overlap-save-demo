@@ -44,6 +44,12 @@ import static org.assertj.core.api.Assertions.within;
  * array, the cost is the array store (no flattening); if it still loses, the
  * multiply itself is slower. That separates scalarization from flattening.
  *
+ * <p>A third phase ({@link #valueMultiply_preallocatedBuffers_reportsWorstCase})
+ * is the real-time shape: output buffers are allocated once and reused, so the
+ * only allocation left is the per-element product object. It reports median,
+ * p95 and max across all reps, because for live audio the worst block is the
+ * budget, not the average one.
+ *
  * <p>Deliberately no "must be faster" assertion: this test logs numbers for the
  * blog post. A perf assertion would fail on a cold CI box and tell us nothing.
  */
@@ -258,6 +264,165 @@ class ValueObjectPerformanceTest {
         log.info("Reduce sink: {}", sink);
     }
 
+    /**
+     * Phase 3 — the real-time shape. Output buffers are allocated once, before
+     * timing, and reused for every call, so no result array is allocated in the
+     * timed loop. Reports median, p95 and max across all reps (5 outer runs x
+     * 5 reps = 25 samples per arm per size; with 25 samples p99 is the max, so
+     * max is reported explicitly instead of a p99 that would just be the max).
+     * For live audio the worst block is the budget, not the average one.
+     */
+    @Test
+    void valueMultiply_preallocatedBuffers_reportsWorstCase() {
+        int[] sizes = {256, 4096, 16384};
+        List<TestData> datasets = new ArrayList<>();
+        for (int size : sizes) {
+            datasets.add(generate(size, 42L));
+        }
+        // Buffers allocated once, reused forever — as in a real-time callback.
+        List<Complex[]> outApache = new ArrayList<>();
+        List<ComplexValue[]> outValue = new ArrayList<>();
+        List<double[][]> outSoa = new ArrayList<>();
+        List<double[]> outInterleaved = new ArrayList<>();
+        for (TestData data : datasets) {
+            outApache.add(new Complex[data.apacheA().length]);
+            outValue.add(new ComplexValue[data.valueA().length]);
+            outSoa.add(new double[][]{new double[data.aRe().length], new double[data.aRe().length]});
+            outInterleaved.add(new double[data.interleavedA().length]);
+        }
+
+        log.info("Preallocated multiply: {} outer runs x {} reps, each rep = {} multiplies, buffers reused",
+                OUTER_RUNS, TIMED_REPS, INNER_ITERATIONS);
+
+        // All rep times (ns) per arm per size, pooled across outer runs.
+        List<List<Long>> apacheTimes = newTimesTable(sizes.length);
+        List<List<Long>> valueTimes = newTimesTable(sizes.length);
+        List<List<Long>> soaTimes = newTimesTable(sizes.length);
+        List<List<Long>> interleavedTimes = newTimesTable(sizes.length);
+        List<List<Long>> apacheGcRuns = newGcTable(sizes.length);
+        List<List<Long>> valueGcRuns = newGcTable(sizes.length);
+        List<List<Long>> soaGcRuns = newGcTable(sizes.length);
+        List<List<Long>> interleavedGcRuns = newGcTable(sizes.length);
+
+        double sink = 0.0;
+        for (int run = 0; run < OUTER_RUNS; run++) {
+            log.info("--- Preallocated run {}/{} ---", run + 1, OUTER_RUNS);
+            log.info("Size | Apache med (max) | Value med (max) | SoA med (max) | Interleaved med (max) | GC Apache/Value/SoA/Interleaved");
+            for (int s = 0; s < sizes.length; s++) {
+                TestData data = datasets.get(s);
+
+                // Warmup on the exact timed code paths, with the reused buffers.
+                for (int i = 0; i < WARMUP_ITERATIONS; i++) {
+                    multiplyIntoApache(data.apacheA(), data.apacheB(), outApache.get(s));
+                    multiplyIntoValue(data.valueA(), data.valueB(), outValue.get(s));
+                    multiplyIntoSoA(data.aRe(), data.aIm(), data.bRe(), data.bIm(),
+                            outSoa.get(s)[0], outSoa.get(s)[1]);
+                    multiplyIntoInterleaved(data.interleavedA(), data.interleavedB(), outInterleaved.get(s));
+                }
+                sink += checksum(outApache.get(s)) + checksum(outValue.get(s))
+                        + checksum(outSoa.get(s)) + checksum(outInterleaved.get(s));
+
+                // Correctness: the reused-buffer results must match the allocating ones.
+                if (run == 0) {
+                    assertIntoAgrees(data, outApache.get(s), outValue.get(s), outSoa.get(s), outInterleaved.get(s));
+                }
+
+                // Final locals: the loop index s is not effectively final, so the
+                // lambdas below cannot capture it directly.
+                final Complex[] apacheOut = outApache.get(s);
+                final ComplexValue[] valueOut = outValue.get(s);
+                final double[][] soaOut = outSoa.get(s);
+                final double[] interleavedOut = outInterleaved.get(s);
+
+                long gcBefore = gcCount();
+                List<Long> apacheReps = collectRepTimes(() -> {
+                    multiplyIntoApache(data.apacheA(), data.apacheB(), apacheOut);
+                    return apacheOut;
+                });
+                long apacheGc = gcCount() - gcBefore;
+
+                gcBefore = gcCount();
+                List<Long> valueReps = collectRepTimes(() -> {
+                    multiplyIntoValue(data.valueA(), data.valueB(), valueOut);
+                    return valueOut;
+                });
+                long valueGc = gcCount() - gcBefore;
+
+                gcBefore = gcCount();
+                List<Long> soaReps = collectRepTimes(() -> {
+                    multiplyIntoSoA(data.aRe(), data.aIm(), data.bRe(), data.bIm(), soaOut[0], soaOut[1]);
+                    return soaOut;
+                });
+                long soaGc = gcCount() - gcBefore;
+
+                gcBefore = gcCount();
+                List<Long> interleavedReps = collectRepTimes(() -> {
+                    multiplyIntoInterleaved(data.interleavedA(), data.interleavedB(), interleavedOut);
+                    return interleavedOut;
+                });
+                long interleavedGc = gcCount() - gcBefore;
+
+                apacheTimes.get(s).addAll(apacheReps);
+                valueTimes.get(s).addAll(valueReps);
+                soaTimes.get(s).addAll(soaReps);
+                interleavedTimes.get(s).addAll(interleavedReps);
+                apacheGcRuns.get(s).add(apacheGc);
+                valueGcRuns.get(s).add(valueGc);
+                soaGcRuns.get(s).add(soaGc);
+                interleavedGcRuns.get(s).add(interleavedGc);
+
+                log.info("{} | {} ({}) | {} ({}) | {} ({}) | {} ({}) | {}/{}/{}/{}",
+                        sizes[s],
+                        percentileMs(apacheReps, 50), percentileMs(apacheReps, 100),
+                        percentileMs(valueReps, 50), percentileMs(valueReps, 100),
+                        percentileMs(soaReps, 50), percentileMs(soaReps, 100),
+                        percentileMs(interleavedReps, 50), percentileMs(interleavedReps, 100),
+                        apacheGc, valueGc, soaGc, interleavedGc);
+                sink += percentileMs(apacheReps, 50) + percentileMs(valueReps, 50)
+                        + percentileMs(soaReps, 50) + percentileMs(interleavedReps, 50);
+            }
+        }
+
+        log.info("=== Preallocated summary: median / p95 / max across all {} reps, GC = total collections ===",
+                OUTER_RUNS * TIMED_REPS);
+        log.info("Size | Apache | Value | SoA | Interleaved | Value vs Apache (median) | GC Apache/Value/SoA/Interleaved");
+        for (int s = 0; s < sizes.length; s++) {
+            log.info("{} | {}/{}/{} | {}/{}/{} | {}/{}/{} | {}/{}/{} | {}x | {}/{}/{}/{}",
+                    sizes[s],
+                    percentileMs(apacheTimes.get(s), 50), percentileMs(apacheTimes.get(s), 95), percentileMs(apacheTimes.get(s), 100),
+                    percentileMs(valueTimes.get(s), 50), percentileMs(valueTimes.get(s), 95), percentileMs(valueTimes.get(s), 100),
+                    percentileMs(soaTimes.get(s), 50), percentileMs(soaTimes.get(s), 95), percentileMs(soaTimes.get(s), 100),
+                    percentileMs(interleavedTimes.get(s), 50), percentileMs(interleavedTimes.get(s), 95), percentileMs(interleavedTimes.get(s), 100),
+                    percentileMs(apacheTimes.get(s), 50) / percentileMs(valueTimes.get(s), 50),
+                    sumOf(apacheGcRuns.get(s)), sumOf(valueGcRuns.get(s)),
+                    sumOf(soaGcRuns.get(s)), sumOf(interleavedGcRuns.get(s)));
+        }
+        log.info("Preallocated sink: {}", sink);
+    }
+
+    private void assertIntoAgrees(TestData data, Complex[] apacheOut, ComplexValue[] valueOut,
+                                  double[][] soaOut, double[] interleavedOut) {
+        Complex[] apache = multiplyApache(data.apacheA(), data.apacheB());
+        for (int i = 0; i < apache.length; i++) {
+            assertThat(apacheOut[i].getReal()).isCloseTo(apache[i].getReal(), within(1e-9));
+            assertThat(apacheOut[i].getImaginary()).isCloseTo(apache[i].getImaginary(), within(1e-9));
+            assertThat(valueOut[i].real()).isCloseTo(apache[i].getReal(), within(1e-9));
+            assertThat(valueOut[i].imaginary()).isCloseTo(apache[i].getImaginary(), within(1e-9));
+            assertThat(soaOut[0][i]).isCloseTo(apache[i].getReal(), within(1e-9));
+            assertThat(soaOut[1][i]).isCloseTo(apache[i].getImaginary(), within(1e-9));
+            assertThat(interleavedOut[2 * i]).isCloseTo(apache[i].getReal(), within(1e-9));
+            assertThat(interleavedOut[2 * i + 1]).isCloseTo(apache[i].getImaginary(), within(1e-9));
+        }
+    }
+
+    private List<List<Long>> newTimesTable(int sizes) {
+        List<List<Long>> table = new ArrayList<>();
+        for (int i = 0; i < sizes; i++) {
+            table.add(new ArrayList<>());
+        }
+        return table;
+    }
+
     private List<List<Double>> newRunsTable(int sizes) {
         List<List<Double>> table = new ArrayList<>();
         for (int i = 0; i < sizes; i++) {
@@ -344,6 +509,28 @@ class ValueObjectPerformanceTest {
         return nanos.get(nanos.size() / 2) / 1_000_000.0;
     }
 
+    /** All rep times (ns) for one arm, unsorted — the caller derives median/p95/max. */
+    private List<Long> collectRepTimes(java.util.function.Supplier<Object> work) {
+        List<Long> nanos = new ArrayList<>();
+        for (int rep = 0; rep < TIMED_REPS; rep++) {
+            long start = System.nanoTime();
+            for (int i = 0; i < INNER_ITERATIONS; i++) {
+                blackhole = work.get();
+            }
+            nanos.add(System.nanoTime() - start);
+        }
+        assertThat(blackhole).isNotNull();
+        return nanos;
+    }
+
+    /** Percentile of rep times in ms; p is 50, 95, 99, ... */
+    private double percentileMs(List<Long> nanos, double p) {
+        List<Long> sorted = new ArrayList<>(nanos);
+        Collections.sort(sorted);
+        int index = Math.min(sorted.size() - 1, (int) Math.ceil(p / 100.0 * sorted.size()) - 1);
+        return sorted.get(Math.max(0, index)) / 1_000_000.0;
+    }
+
     // The three arms. Each allocates its result fresh per call, like SignalTransformer.multiply does.
 
     private Complex[] multiplyApache(Complex[] a, Complex[] b) {
@@ -385,6 +572,42 @@ class ValueObjectPerformanceTest {
             out[i + 1] = aRe * bIm + aIm * bRe;
         }
         return out;
+    }
+
+    // Preallocated ("into") variants: write into a caller-supplied output
+    // buffer instead of allocating a fresh result array per call — the shape
+    // real-time code uses. Note the object arms still allocate one product
+    // object per element via multiply(); only the result *array* allocation
+    // goes away. The flat arms allocate nothing at all in the timed loop.
+    private void multiplyIntoApache(Complex[] a, Complex[] b, Complex[] out) {
+        for (int i = 0; i < a.length; i++) {
+            out[i] = a[i].multiply(b[i]);
+        }
+    }
+
+    private void multiplyIntoValue(ComplexValue[] a, ComplexValue[] b, ComplexValue[] out) {
+        for (int i = 0; i < a.length; i++) {
+            out[i] = a[i].multiply(b[i]);
+        }
+    }
+
+    private void multiplyIntoSoA(double[] aRe, double[] aIm, double[] bRe, double[] bIm,
+                                 double[] outRe, double[] outIm) {
+        for (int i = 0; i < aRe.length; i++) {
+            outRe[i] = aRe[i] * bRe[i] - aIm[i] * bIm[i];
+            outIm[i] = aRe[i] * bIm[i] + aIm[i] * bRe[i];
+        }
+    }
+
+    private void multiplyIntoInterleaved(double[] a, double[] b, double[] out) {
+        for (int i = 0; i < a.length; i += 2) {
+            double aRe = a[i];
+            double aIm = a[i + 1];
+            double bRe = b[i];
+            double bIm = b[i + 1];
+            out[i] = aRe * bRe - aIm * bIm;
+            out[i + 1] = aRe * bIm + aIm * bRe;
+        }
     }
 
     // No-store reduces: multiply each pair and accumulate, allocating nothing
