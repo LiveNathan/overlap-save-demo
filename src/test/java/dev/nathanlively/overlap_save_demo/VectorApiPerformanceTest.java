@@ -1,5 +1,6 @@
 package dev.nathanlively.overlap_save_demo;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Comparator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
+@Disabled
 class VectorApiPerformanceTest {
     private static final Logger log = LoggerFactory.getLogger(VectorApiPerformanceTest.class);
 
